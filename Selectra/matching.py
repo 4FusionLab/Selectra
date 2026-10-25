@@ -27,6 +27,7 @@ class Descriptor:
     position: Optional[Vector] = None  # A point on a plane, in the snapshot frame.
     adjacent_faces: Optional[int] = None
     face_angle: Optional[float] = None  # Radians; undefined on boundaries/nonmanifold edges.
+    contours: tuple = ()  # Ordered trimmed planar loops, outer first, cm.
 
     def __post_init__(self):
         for field in ('direction', 'normal', 'position'):
@@ -36,6 +37,12 @@ class Descriptor:
                 if len(value) != 3 or not all(isfinite(v) for v in value):
                     raise ValueError('Vectors need three finite components.')
                 object.__setattr__(self, field, value)
+        contours = tuple(tuple(tuple(p) for p in loop) for loop in self.contours)
+        if any(len(loop) < 3 for loop in contours):
+            raise ValueError('Contours need at least three points per loop.')
+        if any(len(p) != 3 or not all(isfinite(v) for v in p) for loop in contours for p in loop):
+            raise ValueError('Contour points need three finite components.')
+        object.__setattr__(self, 'contours', contours)
 
 
 @dataclass(frozen=True)

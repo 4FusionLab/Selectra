@@ -16,8 +16,11 @@ class HighlightRenderer:
         self.group = None
         self.graphics = {}
         self.geometry = {}
+        self.outlines = {}
+        self.focus_keys = ()
         self.keys = ()
         self.frames = 0
+        self.last_seconds = 0.0
 
     def clear(self):
         if self.group and self.group.isValid:
@@ -25,28 +28,36 @@ class HighlightRenderer:
         self.group = None
         self.graphics.clear()
         self.geometry.clear()
+        self.outlines.clear()
         self.keys = ()
+        self.focus_keys = ()
 
-    def show(self, references, keys):
+    def show(self, references, keys, focus_keys=()):
         keys = tuple(sorted(keys))
+        started = monotonic()
+        focus_keys = tuple(sorted(set(focus_keys) & set(keys)))
         if not self.body.isValid or self.body.revisionId != self.revision:
             self.clear()
             raise ValueError('Body geometry changed. Restart Select Similar.')
         if len(keys) > self.MAX_ENTITIES:
             self.clear()
             raise ValueError('Highlight exceeds 2,000 entities. Refine the selection first.')
-        if (keys == self.keys and self.group and self.group.isValid
-                and all(graphic.isValid for graphic in self.graphics.values())):
+        if (keys == self.keys and focus_keys == self.focus_keys and self.group and self.group.isValid
+                and all(graphic.isValid for graphic in self.graphics.values())
+                and all(graphic.isValid for graphic in self.outlines.values())):
             self.group.isVisible = True
             for key, graphic in self.graphics.items():
                 graphic.isVisible = key in keys
+            for key, graphic in self.outlines.items():
+                graphic.isVisible = key in focus_keys
+            self.last_seconds = monotonic() - started
             return
-        started = monotonic()
         try:
             # Reuse a valid overlay. Hiding cached members avoids destructive
             # per-object deletes and the blank frame of clear/rebuild updates.
             if (not self.group or not self.group.isValid
                     or any(not graphic.isValid for graphic in self.graphics.values())
+                    or any(not graphic.isValid for graphic in self.outlines.values())
                     or len(set(self.graphics) | set(keys)) > self.MAX_ENTITIES):
                 self.clear()
                 self.group = self.body.parentComponent.customGraphicsGroups.add()
@@ -79,9 +90,42 @@ class HighlightRenderer:
                     raise RuntimeError('Could not set the highlight transparency.')
                 self.graphics[key] = graphic
                 self.geometry[key] = temporary
+            for key, graphic in self.outlines.items():
+                graphic.isVisible = key in focus_keys
+            for key in focus_keys:
+                if key in self.outlines:
+                    self.outlines[key].isVisible = True
+                    continue
+                entity = references[key]
+                edges = (entity,) if adsk.fusion.BRepEdge.cast(entity) else tuple(
+                    entity.edges.item(i) for i in range(entity.edges.count))
+                coordinates, lengths = [], []
+                for edge in edges:
+                    if monotonic() - started > self.BUILD_SECONDS:
+                        raise ValueError('Outline exceeded the time budget. Refine the selection.')
+                    ok, low, high = edge.evaluator.getParameterExtents()
+                    if not ok:
+                        raise ValueError('Could not read the highlighted boundary.')
+                    ok, points = edge.evaluator.getStrokes(low, high, 1e-4)
+                    if not ok or len(points) < 2:
+                        raise ValueError('Could not draw the highlighted boundary.')
+                    if len(coordinates)//3 + len(points) > 100000:
+                        raise ValueError('Outline exceeds the graphics point budget.')
+                    lengths.append(len(points))
+                    coordinates.extend(value for point in points for value in (point.x, point.y, point.z))
+                graphic = self.group.addLines(adsk.fusion.CustomGraphicsCoordinates.create(coordinates), [], True, lengths)
+                if not graphic:
+                    raise RuntimeError('Could not display the boundary outline.')
+                graphic.color = adsk.fusion.CustomGraphicsShowThroughColorEffect.create(magenta, 1.0)
+                graphic.weight = 3.0
+                graphic.depthPriority = 20
+                graphic.isSelectable = False
+                self.outlines[key] = graphic
             self.keys = keys
+            self.focus_keys = focus_keys
             self.frames += 1
             adsk.core.Application.get().activeViewport.refresh()
+            self.last_seconds = monotonic() - started
         except Exception:
             self.clear()
             raise

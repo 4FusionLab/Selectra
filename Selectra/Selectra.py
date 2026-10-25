@@ -52,7 +52,11 @@ class Session:
         self.preview_error = ''
         self.updating = False
         self.snapshot, examples, self.refs, self.skipped, self.source_body = adapter.read_snapshot(self.original)
+        from time import monotonic
+        self.timings = dict(adapter.read_snapshot.last_timings)
+        analysis_started = monotonic()
         self.controller = SelectionSession(self.snapshot, examples)
+        self.timings['initial_analysis_seconds'] = monotonic() - analysis_started
         self.renderer = HighlightRenderer(self.source_body, self.snapshot.revision)
         command.isRepeatable = False
         command.isExecutedWhenPreEmpted = False
@@ -133,10 +137,20 @@ class Session:
         previous, self.updating = self.updating, True
         try:
             keys = self.chosen_keys()
-            self.renderer.show(self.refs, keys)
+            self.renderer.show(self.refs, keys, self.controller.boundary_group)
             self.preview_error = ''
             noun = 'edges' if self.snapshot.entities[0].kind == 'edge' else 'faces'
             status = '{} of {} {} · {}'.format(len(keys), len(self.snapshot.entities), noun, self.source_body.name)
+            labels = {'shape': 'Same trimmed shape and size', 'direct_wall': 'Opposite side of the example wall',
+                      'analog_wall': 'Opposite side of a shape analog', 'wall_sides': 'Matching wall pairs',
+                      'repeated_region': 'Repeated group with matching shape and arrangement',
+                      'parallel_planes': 'Parallel planes', 'same_area': 'Same area; shape may differ',
+                      'approximate': 'Broader geometric similarity; shape not confirmed'}
+            ranking = self.controller.ranking
+            if self.controller.level and ranking.explanations:
+                status += '<br>' + labels.get(ranking.explanations[self.controller.level-1], 'Geometric similarity')
+            if self.controller.level == len(ranking.tiers) and self.controller.level:
+                status += '<br>All permitted items of this type in the source body.'
             if self.controller.ranking.ambiguous:
                 status += '<br>Add an example or exclude an unwanted item.'
             self.info.text = status

@@ -8,6 +8,7 @@ Extraction of real BRep region graphs still needs native Fusion acceptance.
 from dataclasses import dataclass
 
 from .matching import Tolerance, _near
+from .region_geometry import region_geometry_match
 
 
 @dataclass(frozen=True)
@@ -24,6 +25,12 @@ class RegionSearch:
 
 def similar_regions(snapshot, pattern, *, compare_geometry=False, tolerance=None,
                     max_states=50000, max_results=1000, max_pattern=12):
+    """Find induced regions; strict geometry currently supports planar faces.
+
+    ``compare_geometry=True`` requires complete contours and one common 3D
+    isometry. Unsupported/missing input or work exhaustion is incomplete and
+    cannot be applied as a complete selection. Topology-only is unchanged.
+    """
     pattern = snapshot.require_keys(pattern)
     if not pattern:
         return RegionSearch((), True, 0)
@@ -58,9 +65,17 @@ def similar_regions(snapshot, pattern, *, compare_geometry=False, tolerance=None
                     return False
         return True
 
+    states, complete = 0, True
+    if compare_geometry:
+        descriptors = tuple(snapshot.by_key[k] for k in pattern)
+        proof = region_geometry_match(descriptors, descriptors, t, max_states=max_states)
+        states += proof.states
+        if not proof.complete or not proof.matched:
+            return RegionSearch((), False, states)
+
     # Build candidates inside the same state budget. Preparation must not do
     # an unbounded O(pattern * body) pass before the search budget starts.
-    states, complete, options = 0, True, {}
+    options = {}
     for key in pattern:
         options[key] = []
         for target in snapshot.by_key:
@@ -68,6 +83,8 @@ def similar_regions(snapshot, pattern, *, compare_geometry=False, tolerance=None
                 return RegionSearch((), False, states)
             states += 1
             if len(neighbours[target]) >= degree[key] and compatible(key, target):
+                if compare_geometry and not snapshot.by_key[target].contours:
+                    return RegionSearch((), False, states)
                 options[key].append(target)
     order = sorted(pattern, key=lambda k: (len(options[k]), -degree[k], k))
     mapping, used, matches = {}, set(), set()
@@ -76,6 +93,22 @@ def similar_regions(snapshot, pattern, *, compare_geometry=False, tolerance=None
         nonlocal states, complete
         if depth == len(order):
             region = tuple(sorted(used))
+            if region in matches:
+                return
+            if compare_geometry:
+                if states >= max_states:
+                    complete = False
+                    return
+                proof = region_geometry_match(
+                    tuple(snapshot.by_key[k] for k in pattern),
+                    tuple(snapshot.by_key[mapping[k]] for k in pattern), t,
+                    max_states=max_states-states)
+                states += proof.states
+                if not proof.complete:
+                    complete = False
+                    return
+                if not proof.matched:
+                    return
             if region not in matches and len(matches) >= max_results:
                 complete = False
                 return

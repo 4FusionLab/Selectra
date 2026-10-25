@@ -27,6 +27,8 @@ class Ranking:
     ambiguous: bool
     distances: tuple = ()
     automatic_level: int = 0
+    explanations: tuple = ()
+    hypothesis: str = ''
 
 
 FEATURES = (('geometry', .8), ('measure', 1.2), ('radius', 1.6),
@@ -113,18 +115,42 @@ def rank(snapshot, examples, exclusions=(), tolerance=None, *, criterion='auto')
         rows.append(RankedEntity(d.key, 0.0 if d.key in examples else distance,
                                  d.key in exclusions, d.key in examples))
     rows.sort(key=lambda item: (item.distance, not item.example, item.key))
-    tiers, distances = [], []
+    tiers, distances, bands = [], [], []
     for item in rows:
         if item.example or item.blocked:
             continue
-        if not distances or not isclose(item.distance, distances[-1], abs_tol=1e-9, rel_tol=1e-9):
+        band = next(i for i, ceiling in enumerate((0, .005, .02, .05, .10, .20, .35, .60, 1.0))
+                    if item.distance <= ceiling + 1e-9)
+        # Curves use stable distance bands rather than dozens of numerical
+        # steps for one size family. Exact matches remain a separate tier.
+        same_tier = (band == bands[-1] if snapshot.entities[0].kind == 'edge' and bands
+                     else bool(distances) and isclose(item.distance, distances[-1], abs_tol=1e-9, rel_tol=1e-9))
+        if not same_tier:
             tiers.append([])
             distances.append(item.distance)
+            bands.append(band)
         tiers[-1].append(item.key)
     identical_exclusion = any(item.blocked and item.distance <= 1e-12 for item in rows)
     # Open on the first nonempty group beyond the examples. A fixed score
     # threshold could otherwise leave an apparently inactive seed-only view.
     automatic_level = 1 if informative and distances and not identical_exclusion else 0
+    if criterion == 'auto':
+        from .intentions import geometric_order
+        order = geometric_order(snapshot, examples, exclusions, t, rows)
+        if order is not None:
+            group_distance = {key: index / max(1, len(order.groups))
+                              for index, group in enumerate(order.groups) for key in group}
+            rows = [RankedEntity(r.key, 0.0 if r.example else group_distance.get(r.key, r.distance),
+                                 r.blocked, r.example) for r in rows]
+            rows.sort(key=lambda r: (r.distance, not r.example, r.key))
+            return Ranking(tuple(rows), order.groups, tuple(field for field, _ in features),
+                           order.ambiguous, tuple(i / max(1, len(order.groups)) for i in range(len(order.groups))),
+                           0 if order.ambiguous or not order.groups else 1,
+                           order.explanations, order.hypothesis)
+        if all(s.kind == 'face' and s.geometry == 'plane' for s in seeds) and any(not s.contours for s in seeds):
+            return Ranking(tuple(rows), tuple(tuple(tier) for tier in tiers),
+                           tuple(field for field, _ in features), True, tuple(distances), 0,
+                           tuple('approximate' for _ in tiers), 'unverified_shape')
     return Ranking(tuple(rows), tuple(tuple(tier) for tier in tiers),
                    tuple(field for field, _ in features), not informative or identical_exclusion,
                    tuple(distances), automatic_level)

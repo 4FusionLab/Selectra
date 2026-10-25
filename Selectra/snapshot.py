@@ -14,6 +14,7 @@ class BodySnapshot:
     revision: str
     entities: tuple
     links: tuple = ()  # Undirected, same-kind adjacency (edge-edge or face-face).
+    wall_pairs: tuple = ()  # Planar pairs with local material evidence (not a volume proof).
     by_key: object = field(init=False, repr=False, compare=False)
     adjacency: object = field(init=False, repr=False, compare=False)
 
@@ -50,6 +51,14 @@ class BodySnapshot:
             adjacency[b].add(a)
         object.__setattr__(self, 'entities', entities)
         object.__setattr__(self, 'links', tuple(sorted(links)))
+        wall_pairs = set()
+        for a, b in self.wall_pairs:
+            if a not in by_key or b not in by_key or a == b:
+                raise ValueError('Wall pairs must reference distinct faces inside the body.')
+            if any(by_key[k].kind != 'face' or by_key[k].geometry != 'plane' for k in (a, b)):
+                raise ValueError('Wall pairs require planar faces.')
+            wall_pairs.add(tuple(sorted((a, b))))
+        object.__setattr__(self, 'wall_pairs', tuple(sorted(wall_pairs)))
         object.__setattr__(self, 'by_key', MappingProxyType(by_key))
         object.__setattr__(self, 'adjacency', MappingProxyType({k: tuple(sorted(v)) for k, v in adjacency.items()}))
 
@@ -60,12 +69,13 @@ class BodySnapshot:
         return keys
 
     def to_dict(self):
-        return {'schema_version': 1, 'scope_key': self.scope_key, 'revision': self.revision,
-                'entities': [asdict(d) for d in self.entities], 'links': [list(link) for link in self.links]}
+        return {'schema_version': 2, 'scope_key': self.scope_key, 'revision': self.revision,
+                'entities': [asdict(d) for d in self.entities], 'links': [list(link) for link in self.links],
+                'wall_pairs': [list(pair) for pair in self.wall_pairs]}
 
     @classmethod
     def from_dict(cls, data):
-        if data.get('schema_version') != 1:
+        if data.get('schema_version') not in (1, 2):
             raise ValueError('Unsupported snapshot schema.')
         entities = []
         for row in data['entities']:
@@ -77,7 +87,8 @@ class BodySnapshot:
                         raise ValueError('Vectors need three finite components.')
                     row[key] = tuple(vector)
             entities.append(Descriptor(**row))
-        return cls(data['scope_key'], data['revision'], tuple(entities), tuple(data.get('links', ())))
+        return cls(data['scope_key'], data['revision'], tuple(entities), tuple(data.get('links', ())),
+                   tuple(data.get('wall_pairs', ())))
 
     def to_json(self):
         return json.dumps(self.to_dict(), ensure_ascii=False, sort_keys=True, allow_nan=False)

@@ -14,7 +14,7 @@ def source_files(root):
     files = {root / name for name in ('.gitignore', '.gitattributes', '.editorconfig', 'LICENSE', 'selectra.png')}
     files.update(root.glob('*.md'))
     patterns = {'Selectra': ('*.py', '*.manifest'), 'scripts': ('*.py',),
-                'tests': ('*.py',), 'docs': ('*.md',), '.github': ('*.yml', '*.md')}
+                'tests': ('*.py',), 'evaluation': ('*.py', '*.json'), 'docs': ('*.md',), '.github': ('*.yml', '*.md')}
     for directory, globs in patterns.items():
         for pattern in globs:
             files.update((root / directory).rglob(pattern))

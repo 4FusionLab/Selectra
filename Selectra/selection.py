@@ -96,6 +96,11 @@ class SelectionSession:
     def additional_result(self):
         return tuple(k for k in self.result if k not in self.feedback.examples)
 
+    @property
+    def boundary_group(self):
+        """The outermost included tier; stable between preview callbacks."""
+        return self.ranking.tiers[self.level-1] if self.level else ()
+
     def adjust_similarity(self, steps):
         if type(steps) is not int or abs(steps) > 10000:
             raise ValueError('Similarity steps must be an integer in [-10000, 10000].')

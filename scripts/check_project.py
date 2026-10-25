@@ -25,7 +25,7 @@ def check(root=ROOT):
     for name in required:
         assert (root / name).is_file(), 'Missing: ' + name
     assert 'GNU GENERAL PUBLIC LICENSE' in (root / 'LICENSE').read_text(encoding='utf-8')
-    for directory in ('Selectra', 'scripts', 'tests'):
+    for directory in ('Selectra', 'scripts', 'tests', 'evaluation'):
         for path in (root / directory).rglob('*.py'):
             assert path.read_text(encoding='utf-8').startswith(
                 '# SPDX-License-Identifier: GPL-3.0-only\n'), str(path)
