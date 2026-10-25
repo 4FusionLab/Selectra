@@ -59,7 +59,8 @@ def _world_descriptor(descriptor, context):
     return replace(descriptor, position=point(descriptor.position) if descriptor.position else None,
                    normal=vector(descriptor.normal) if descriptor.normal else None,
                    direction=vector(descriptor.direction) if descriptor.direction else None,
-                   contours=tuple(tuple(point(p) for p in loop) for loop in descriptor.contours))
+                   contours=tuple(tuple(point(p) for p in loop) for loop in descriptor.contours),
+                   planes=tuple((vector(n), point(p)) for n, p in descriptor.planes))
 
 
 def _unbroken_material_traces(body, probe, started):
@@ -162,12 +163,23 @@ def describe(entity):
     family = names.get(family, family)
     direction = normal = radius = perimeter = sides = loops = position = None
     contours = ()
+    planes = ()
     if entity_kind == 'edge':
         if entity.isDegenerate:
             raise ValueError('Degenerate edges are not supported.')
         measure = entity.length
         if family == 'line':
             direction = _vector(geometry.startPoint.vectorTo(geometry.endPoint))
+        if family in ('circle', 'arc'):
+            normal, position = _vector(geometry.normal), _vector(geometry.center)
+            planes = ((normal, position),)
+        else:
+            support = []
+            for face in entity.faces:
+                plane = adsk.core.Plane.cast(face.geometry)
+                if plane:
+                    support.append((_vector(plane.normal), _vector(plane.origin)))
+            planes = tuple(support)
     elif entity_kind == 'face':
         measure = entity.area
         perimeter = sum(entity.edges.item(i).length for i in range(entity.edges.count))
@@ -193,7 +205,7 @@ def describe(entity):
     # tempId is only session-local and only used within this unchanged body.
     return Descriptor(str(entity.tempId), entity_kind, family, measure,
                       perimeter, radius, direction, normal, sides, loops,
-                      position=position, contours=contours,
+                      position=position, contours=contours, planes=planes,
                       adjacent_faces=entity.faces.count if entity_kind == 'edge' else None)
 
 

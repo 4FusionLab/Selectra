@@ -199,6 +199,10 @@ class Session:
             ranking = self.controller.ranking
             if self.controller.level and ranking.explanations:
                 status += '\n' + labels.get(ranking.explanations[self.controller.level-1], 'Geometric similarity')
+            if self.controller.level and ranking.plane_groups:
+                plane_labels = {'coplanar': 'In the example plane', 'parallel': 'In parallel planes',
+                                'other': 'In other planes', 'unknown': 'Support plane unavailable'}
+                status += '\n' + plane_labels[ranking.plane_groups[self.controller.level-1]]
             if self.controller.level == len(ranking.tiers) and self.controller.level:
                 status += '\nAll permitted items of this type in the search scope.'
             if self.controller.ranking.ambiguous:

@@ -28,6 +28,7 @@ class Descriptor:
     adjacent_faces: Optional[int] = None
     face_angle: Optional[float] = None  # Radians; undefined on boundaries/nonmanifold edges.
     contours: tuple = ()  # Ordered trimmed planar loops, outer first, cm.
+    planes: tuple = ()  # Edge support planes: (normal, point); a line can have several.
 
     def __post_init__(self):
         for field in ('direction', 'normal', 'position'):
@@ -43,6 +44,12 @@ class Descriptor:
         if any(len(p) != 3 or not all(isfinite(v) for v in p) for loop in contours for p in loop):
             raise ValueError('Contour points need three finite components.')
         object.__setattr__(self, 'contours', contours)
+        planes = tuple((tuple(n), tuple(p)) for n, p in self.planes)
+        if any(len(v) != 3 or not all(isfinite(x) for x in v) for plane in planes for v in plane):
+            raise ValueError('Support planes need finite 3D normals and points.')
+        if any(not any(normal) for normal, _ in planes):
+            raise ValueError('Support plane normals must be nonzero.')
+        object.__setattr__(self, 'planes', planes)
 
 
 @dataclass(frozen=True)

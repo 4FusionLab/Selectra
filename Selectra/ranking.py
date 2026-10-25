@@ -4,7 +4,7 @@
 Distance is a geometric ranking score, not a probability. Examples teach
 which properties are invariant. Exclusions remain ranked but are blocked.
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from itertools import combinations
 from math import isclose, isfinite, pi
 
@@ -29,6 +29,7 @@ class Ranking:
     automatic_level: int = 0
     explanations: tuple = ()
     hypothesis: str = ''
+    plane_groups: tuple = ()
 
 
 FEATURES = (('geometry', .8), ('measure', 1.2), ('radius', 1.6),
@@ -38,7 +39,7 @@ FEATURES = (('geometry', .8), ('measure', 1.2), ('radius', 1.6),
 
 def _value(d, field):
     value = getattr(d, field)
-    if field == 'normal' and d.geometry != 'plane':
+    if field == 'normal' and d.geometry not in ('plane', 'circle', 'arc'):
         return None
     if field in ('normal', 'direction'):
         return value if value and any(value) else None
@@ -52,7 +53,7 @@ def _difference(a, b, field, tolerance, deadband=True, *, axial_normal=False):
     if field == 'geometry':
         return float(x != y)
     if field in ('direction', 'normal'):
-        axial = field == 'direction' or (field == 'normal' and axial_normal)
+        axial = field == 'direction' or (field == 'normal' and (axial_normal or a.kind == 'edge'))
         maximum = pi / 2 if axial else pi
         angle = _angle(x, y, axial=axial)
         threshold = tolerance.angle if deadband else 0
@@ -70,7 +71,7 @@ def _difference(a, b, field, tolerance, deadband=True, *, axial_normal=False):
     return min(1.0, max(0.0, abs(x-y)-threshold) / scale)
 
 
-def rank(snapshot, examples, exclusions=(), tolerance=None, *, criterion='auto'):
+def _rank_base(snapshot, examples, exclusions=(), tolerance=None, *, criterion='auto'):
     allowed = {'auto', 'geometry', 'measure', 'radius', 'direction', 'normal', 'perimeter'}
     if criterion not in allowed:
         raise ValueError('Unsupported ranking criterion.')
@@ -89,6 +90,10 @@ def rank(snapshot, examples, exclusions=(), tolerance=None, *, criterion='auto')
     negatives = tuple(snapshot.by_key[k] for k in exclusions)
     features = []
     for field, base in FEATURES:
+        if field == 'normal' and criterion == 'auto' and seeds[0].kind == 'edge':
+            # Support planes refine geometric families as discrete groups;
+            # they must not demote a rotated equal-size circle to a new size family.
+            continue
         if criterion != 'auto' and field != criterion:
             continue
         if any(_value(d, field) is None for d in seeds):
@@ -154,3 +159,31 @@ def rank(snapshot, examples, exclusions=(), tolerance=None, *, criterion='auto')
     return Ranking(tuple(rows), tuple(tuple(tier) for tier in tiers),
                    tuple(field for field, _ in features), not informative or identical_exclusion,
                    tuple(distances), automatic_level)
+
+
+def rank(snapshot, examples, exclusions=(), tolerance=None, *, criterion='auto'):
+    examples, exclusions = tuple(examples), tuple(exclusions)
+    base = _rank_base(snapshot, examples, exclusions, tolerance, criterion=criterion)
+    if criterion != 'auto' or not examples:
+        return base
+    from .plane_order import split_plane_groups, plane_class
+    split = split_plane_groups(snapshot, base.tiers, examples, tolerance or Tolerance())
+    if split is None:
+        return base
+    tiers, classes, origins = split
+    ambiguous, automatic_level = base.ambiguous, base.automatic_level
+    seeds = tuple(snapshot.by_key[key] for key in examples)
+    identical_negatives = tuple(row for row in base.items if row.blocked and row.distance <= 1e-12)
+    informative = any(field not in ('geometry', 'sides', 'loops', 'adjacent_faces') for field in base.features)
+    if (base.hypothesis == '' and identical_negatives and informative and classes and classes[0] == 'coplanar'
+            and all(plane_class(snapshot.by_key[row.key], seeds, tolerance or Tolerance()) in ('parallel', 'other')
+                    for row in identical_negatives)):
+        ambiguous, automatic_level = False, 1
+    distances = tuple(index/max(1, len(tiers)) for index in range(len(tiers)))
+    by_key = {key: distances[i] for i, tier in enumerate(tiers) for key in tier}
+    items = tuple(sorted((replace(row, distance=by_key.get(row.key, row.distance)) for row in base.items),
+                         key=lambda row: (row.distance, not row.example, row.key)))
+    return replace(base, items=items, tiers=tiers, distances=distances,
+                   automatic_level=1 if automatic_level and tiers else 0, ambiguous=ambiguous,
+                   explanations=tuple(base.explanations[i] for i in origins) if base.explanations else (),
+                   plane_groups=classes)

@@ -109,7 +109,13 @@ def geometric_order(snapshot, examples, exclusions, tolerance, scalar_items):
             repeated = {key for region in search.regions if not set(region) & negatives for key in region}
 
     hypotheses = []
-    if seed_keys <= shapes and not negatives & shapes:
+    from .plane_order import plane_class
+    shape_negatives = negatives & shapes
+    coplanar_shapes = {k for k in shapes if plane_class(snapshot.by_key[k], seeds, tolerance) == 'coplanar'}
+    plane_separates = (bool(coplanar_shapes - seed_keys - negatives)
+                       and all(plane_class(snapshot.by_key[k], seeds, tolerance) in ('parallel', 'other')
+                               for k in shape_negatives))
+    if seed_keys <= shapes and (not shape_negatives or plane_separates):
         hypotheses.append(('shape', shapes))
     if seed_keys <= wall_family and not negatives & wall_family:
         hypotheses.append(('wall_sides', wall_family))

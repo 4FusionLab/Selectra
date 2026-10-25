@@ -36,6 +36,7 @@ class HighlightRenderer:
         keys = tuple(sorted(keys))
         started = monotonic()
         focus_keys = tuple(sorted(set(focus_keys) & set(keys)))
+        line_keys = tuple(sorted(set(focus_keys) | {key for key in keys if adsk.fusion.BRepEdge.cast(references[key])}))
         if not self.body.isValid or self.body.revisionId != self.revision:
             self.clear()
             raise ValueError('Body geometry changed. Restart Select Similar.')
@@ -49,7 +50,8 @@ class HighlightRenderer:
             for key, graphic in self.graphics.items():
                 graphic.isVisible = key in keys
             for key, graphic in self.outlines.items():
-                graphic.isVisible = key in focus_keys
+                graphic.isVisible = key in line_keys
+                graphic.weight = 3.0 if key in focus_keys else 1.5
             self.last_seconds = monotonic() - started
             return
         try:
@@ -96,8 +98,9 @@ class HighlightRenderer:
                 self.graphics[key] = graphic
                 self.geometry[key] = temporary
             for key, graphic in self.outlines.items():
-                graphic.isVisible = key in focus_keys
-            for key in focus_keys:
+                graphic.isVisible = key in line_keys
+                graphic.weight = 3.0 if key in focus_keys else 1.5
+            for key in line_keys:
                 if key in self.outlines:
                     self.outlines[key].isVisible = True
                     continue
@@ -122,7 +125,7 @@ class HighlightRenderer:
                 if not graphic:
                     raise RuntimeError('Could not display the boundary outline.')
                 graphic.color = adsk.fusion.CustomGraphicsShowThroughColorEffect.create(magenta, 1.0)
-                graphic.weight = 3.0
+                graphic.weight = 3.0 if key in focus_keys else 1.5
                 graphic.depthPriority = 20
                 graphic.isSelectable = False
                 self.outlines[key] = graphic

@@ -72,13 +72,13 @@ class BodySnapshot:
         return keys
 
     def to_dict(self):
-        return {'schema_version': 3, 'scope_key': self.scope_key, 'revision': self.revision,
+        return {'schema_version': 4, 'scope_key': self.scope_key, 'revision': self.revision,
                 'entities': [asdict(d) for d in self.entities], 'links': [list(link) for link in self.links],
                 'wall_pairs': [list(pair) for pair in self.wall_pairs], 'relations_complete': self.relations_complete}
 
     @classmethod
     def from_dict(cls, data):
-        if data.get('schema_version') not in (1, 2, 3):
+        if data.get('schema_version') not in (1, 2, 3, 4):
             raise ValueError('Unsupported snapshot schema.')
         entities = []
         for row in data['entities']:
