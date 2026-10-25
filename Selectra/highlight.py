@@ -60,7 +60,9 @@ class HighlightRenderer:
                     or any(not graphic.isValid for graphic in self.outlines.values())
                     or len(set(self.graphics) | set(keys)) > self.MAX_ENTITIES):
                 self.clear()
-                self.group = self.body.parentComponent.customGraphicsGroups.add()
+                component = (adsk.fusion.Design.cast(adsk.core.Application.get().activeProduct).rootComponent
+                             if self.body.assemblyContext else self.body.parentComponent)
+                self.group = component.customGraphicsGroups.add()
                 self.group.isSelectable = False
             desired = set(keys)
             for key, graphic in self.graphics.items():
@@ -77,9 +79,12 @@ class HighlightRenderer:
                 entity = references[key]
                 if not entity.isValid or entity.body != self.body:
                     raise ValueError('Highlight entity is outside the original body.')
-                temporary = manager.copy(entity)
+                context = entity.assemblyContext
+                temporary = manager.copy(entity.nativeObject if context else entity)
                 if not temporary:
                     raise RuntimeError('Could not copy BRep geometry for highlighting.')
+                if context and not manager.transform(temporary, context.transform2):
+                    raise RuntimeError('Could not transform the occurrence highlight.')
                 graphic = self.group.addBRepBody(temporary)
                 if not graphic:
                     raise RuntimeError('Could not display the highlight.')
@@ -126,6 +131,36 @@ class HighlightRenderer:
             self.frames += 1
             adsk.core.Application.get().activeViewport.refresh()
             self.last_seconds = monotonic() - started
+        except Exception:
+            self.clear()
+            raise
+
+
+class ScopeHighlightRenderer:
+    """One atomic preview composed from separate body/occurrence renderers."""
+    def __init__(self, guards):
+        self.renderers = tuple(HighlightRenderer(body, body.revisionId) for body, _ in guards)
+        self.keys, self.focus_keys = (), ()
+        self.last_seconds = 0.0
+
+    def clear(self):
+        for renderer in self.renderers:
+            renderer.clear()
+        self.keys, self.focus_keys = (), ()
+
+    def show(self, references, keys, focus_keys=()):
+        started = monotonic()
+        try:
+            if len(keys) > HighlightRenderer.MAX_ENTITIES:
+                raise ValueError('Highlight exceeds 2,000 entities. Narrow the search scope.')
+            for renderer in self.renderers:
+                own = tuple(k for k in keys if references[k].body == renderer.body)
+                if own or renderer.keys:
+                    renderer.show(references, own, focus_keys)
+                if monotonic()-started > HighlightRenderer.BUILD_SECONDS:
+                    raise ValueError('Scope highlight exceeded the time budget. Narrow the selection.')
+            self.keys, self.focus_keys = tuple(sorted(keys)), tuple(sorted(set(keys) & set(focus_keys)))
+            self.last_seconds = monotonic()-started
         except Exception:
             self.clear()
             raise

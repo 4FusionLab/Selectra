@@ -11,7 +11,8 @@ import adsk.fusion
 from . import fusion_adapter as adapter
 from .matching import Tolerance
 from .selection import SelectionSession
-from .highlight import HighlightRenderer
+from .highlight import HighlightRenderer, ScopeHighlightRenderer
+from .search_scope import SCOPES
 
 COMMAND_ID = 'DiegoV_Selectra_SelectSimilar'
 EVENT_ID = 'DiegoV_Selectra_ApplySelection'
@@ -51,22 +52,31 @@ class Session:
         self.accepted, self.accepted_keys = False, ()
         self.preview_error = ''
         self.updating = False
-        self.snapshot, examples, self.refs, self.skipped, self.source_body = adapter.read_snapshot(self.original)
+        self.scope_mode = 'component'
+        self.scope_notice = ''
+        self.snapshot, examples, self.refs, self.skipped, self.source_body, self.scope_guards = adapter.read_search_scope(self.original, self.scope_mode)
+        self.original = tuple(self.refs[key] for key in examples)
+        self.original_guards = tuple((body, stamp) for body, stamp in self.scope_guards
+                                     if any(e.body == body for e in self.original))
         from time import monotonic
-        self.timings = dict(adapter.read_snapshot.last_timings)
+        self.timings = dict(adapter.read_search_scope.last_timings)
         analysis_started = monotonic()
         self.controller = SelectionSession(self.snapshot, examples)
         self.timings['initial_analysis_seconds'] = monotonic() - analysis_started
-        self.renderer = HighlightRenderer(self.source_body, self.snapshot.revision)
+        self.renderer = self.make_renderer()
         command.isRepeatable = False
         command.isExecutedWhenPreEmpted = False
         command.okButtonText = 'OK'
-        command.setDialogInitialSize(360, 380)
+        command.setDialogInitialSize(380, 440)
         inputs = command.commandInputs
-        self.info = inputs.addTextBoxCommandInput('selectra_info', '', '', 2, True)
+        self.info = inputs.addTextBoxCommandInput('selectra_info', '', '', 3, True)
         self.info.isFullWidth = True
+        self.scope_input = inputs.addDropDownCommandInput('selectra_scope', 'Search Scope', adsk.core.DropDownStyles.TextListDropDownStyle)
+        for mode, label in SCOPES:
+            self.scope_input.listItems.add(label, mode == self.scope_mode, '')
+        self.scope_input.tooltip = 'This Component includes the selected instance and its nested components. All Components searches the entire assembly.'
         selection_filter = 'Edges' if self.snapshot.entities[0].kind == 'edge' else 'Faces'
-        self.examples_input = inputs.addSelectionInput('selectra_examples', 'Examples', 'Add another example from this body')
+        self.examples_input = inputs.addSelectionInput('selectra_examples', 'Examples', 'Add another example from this search scope')
         self.examples_input.addSelectionFilter(selection_filter)
         self.examples_input.setSelectionLimits(1, 0)
         self.exclusions_input = inputs.addSelectionInput('selectra_exclusions', 'Exclude', 'Show an item that should not be included')
@@ -76,7 +86,7 @@ class Session:
             'selectra_range', 'Similarity', 0, max(1, len(self.controller.ranking.tiers)), False)
         self.range_input.setText('Closest', 'Broader')
         self.range_input.tooltip = 'Include less similar items with PgUp; remove the least similar items with PgDown.'
-        hint = inputs.addTextBoxCommandInput('selectra_hint', '', 'PgUp: more | PgDown: fewer', 1, True)
+        hint = inputs.addTextBoxCommandInput('selectra_hint', '', 'PgUp / =: more | PgDown / -: fewer', 1, True)
         hint.isFullWidth = True
         group = inputs.addGroupCommandInput('selectra_refine', 'Refine')
         group.isExpanded = False
@@ -102,6 +112,45 @@ class Session:
         _bind(command.execute, Executed(self), self.bindings)
         _bind(command.destroy, Destroyed(self), self.bindings)
 
+    def make_renderer(self):
+        if len(self.scope_guards) == 1:
+            return HighlightRenderer(self.source_body, self.source_body.revisionId)
+        return ScopeHighlightRenderer(self.scope_guards)
+
+    def entity_key(self, entity):
+        for index, (body, _) in enumerate(self.scope_guards):
+            if entity.body == body:
+                key = '{}:{}'.format(index, entity.tempId) if len(self.scope_guards) > 1 else str(entity.tempId)
+                return key if key in self.refs else None
+        return None
+
+    def change_scope(self, mode):
+        old = self.controller.feedback
+        examples = tuple(self.refs[k] for k in old.examples)
+        exclusions = tuple(self.refs[k] for k in old.exclusions)
+        snapshot, _, refs, skipped, source, guards = adapter.read_search_scope(self.original[:1], mode)
+        lookup = lambda entity: next((key for key, ref in refs.items() if ref == entity), None)
+        example_keys = tuple(lookup(e) for e in examples)
+        if None in example_keys:
+            raise ValueError('Remove examples outside the requested scope before narrowing it.')
+        controller = SelectionSession(snapshot, example_keys)
+        controller.set_tolerance(old.tolerance)
+        controller.set_criterion(old.criterion)
+        controller.replace_exclusions(tuple(k for e in exclusions if (k := lookup(e)) is not None))
+        self.renderer.clear()
+        self.snapshot, self.refs, self.skipped = snapshot, refs, skipped
+        self.source_body, self.scope_guards, self.scope_mode = source, guards, mode
+        self.controller, self.renderer = controller, self.make_renderer()
+        self.scope_notice = ''
+        self.timings = dict(adapter.read_search_scope.last_timings)
+        self.updating = True
+        try:
+            self.exclusions_input.clearSelection()
+            for key in controller.feedback.exclusions:
+                self.exclusions_input.addSelection(refs[key])
+        finally:
+            self.updating = False
+
     def sync_controls(self):
         previous, self.updating = self.updating, True
         try:
@@ -118,9 +167,10 @@ class Session:
 
     def input_keys(self, control):
         entities = tuple(control.selection(i).entity for i in range(control.selectionCount))
-        if any(e.body != self.source_body or e.assemblyContext is not None for e in entities):
-            raise ValueError('Examples and exclusions must belong to the original body.')
-        return self.snapshot.require_keys(str(e.tempId) for e in entities)
+        keys = tuple(self.entity_key(e) for e in entities)
+        if None in keys:
+            raise ValueError('Selection is outside the current search scope.')
+        return self.snapshot.require_keys(keys)
 
     def preview(self):
         self.preview_error = ''
@@ -132,7 +182,7 @@ class Session:
         # a second pass here rolls back/redraws the overlay twice per gesture.
 
     def draw_preview(self):
-        if not self.source_body.isValid or self.source_body.revisionId != self.snapshot.revision:
+        if not adapter.scope_current(self.scope_guards):
             raise RuntimeError('Body geometry changed. Cancel and restart Select Similar.')
         previous, self.updating = self.updating, True
         try:
@@ -140,7 +190,7 @@ class Session:
             self.renderer.show(self.refs, keys, self.controller.boundary_group)
             self.preview_error = ''
             noun = 'edges' if self.snapshot.entities[0].kind == 'edge' else 'faces'
-            status = '{} of {} {} · {}'.format(len(keys), len(self.snapshot.entities), noun, self.source_body.name)
+            status = '{} of {} {} · {}'.format(len(keys), len(self.snapshot.entities), noun, dict(SCOPES)[self.scope_mode])
             labels = {'shape': 'Same trimmed shape and size', 'direct_wall': 'Opposite side of the example wall',
                       'analog_wall': 'Opposite side of a shape analog', 'wall_sides': 'Matching wall pairs',
                       'repeated_region': 'Repeated group with matching shape and arrangement',
@@ -148,11 +198,17 @@ class Session:
                       'approximate': 'Broader geometric similarity; shape not confirmed'}
             ranking = self.controller.ranking
             if self.controller.level and ranking.explanations:
-                status += '<br>' + labels.get(ranking.explanations[self.controller.level-1], 'Geometric similarity')
+                status += '\n' + labels.get(ranking.explanations[self.controller.level-1], 'Geometric similarity')
             if self.controller.level == len(ranking.tiers) and self.controller.level:
-                status += '<br>All permitted items of this type in the source body.'
+                status += '\nAll permitted items of this type in the search scope.'
             if self.controller.ranking.ambiguous:
-                status += '<br>Add an example or exclude an unwanted item.'
+                status += '\nAdd an example or exclude an unwanted item.'
+            if not self.snapshot.relations_complete:
+                status += '\nShape matching available; wall-side search limited.'
+            if any(d.geometry == 'plane' and not d.contours for d in self.snapshot.entities):
+                status += '\nSome complex boundaries could not be compared by shape.'
+            if self.scope_notice:
+                status += '\n' + self.scope_notice
             self.info.text = status
         finally:
             self.updating = previous
@@ -233,7 +289,9 @@ class Changed(adsk.core.InputChangedEventHandler):
             return
         try:
             key = args.input.id
-            if key == 'selectra_range':
+            if key == 'selectra_scope':
+                s.change_scope(SCOPES[s.scope_input.selectedItem.index][0])
+            elif key == 'selectra_range':
                 s.controller.set_level(s.range_input.valueOne)
             elif key == 'selectra_criterion':
                 s.controller.set_criterion(s.criterion_options[s.criterion_input.selectedItem.index][0])
@@ -247,6 +305,13 @@ class Changed(adsk.core.InputChangedEventHandler):
                 return
             s.preview()
         except Exception as error:
+            if args.input.id == 'selectra_scope':
+                s.scope_notice = str(error)
+                s.updating = True
+                try:
+                    s.scope_input.listItems.item(next(i for i, (mode, _) in enumerate(SCOPES) if mode == s.scope_mode)).isSelected = True
+                finally:
+                    s.updating = False
             s.info.text = html.escape(str(error))
             _log()
 
@@ -262,8 +327,8 @@ class AllowedSelection(adsk.core.SelectionEventHandler):
             s = self.session
             valid = (entity.isValid
                      and adapter.kind(entity) == s.snapshot.entities[0].kind
-                     and entity.body == s.source_body and entity.assemblyContext is None)
-            key = str(entity.tempId) if valid else None
+                     and any(entity.body == body for body, _ in s.scope_guards))
+            key = s.entity_key(entity) if valid else None
             if control.id == 'selectra_examples' and key in s.controller.feedback.exclusions:
                 valid = False
             if control.id == 'selectra_exclusions' and key in s.controller.feedback.examples:
@@ -279,9 +344,12 @@ class KeyPressed(adsk.core.KeyboardEventHandler):
         self.session = session
 
     def notify(self, args):
-        if args.modifierMask:
+        steps = {adsk.core.KeyCodes.PageUpKeyCode: 1, adsk.core.KeyCodes.PageDownKeyCode: -1,
+                 adsk.core.KeyCodes.EqualKeyCode: 1, adsk.core.KeyCodes.PlusKeyCode: 1,
+                 adsk.core.KeyCodes.MinusKeyCode: -1}
+        printable = {adsk.core.KeyCodes.EqualKeyCode, adsk.core.KeyCodes.PlusKeyCode, adsk.core.KeyCodes.MinusKeyCode}
+        if args.modifierMask and not (args.keyCode in printable and args.modifierMask == adsk.core.KeyboardModifiers.ShiftKeyboardModifier):
             return
-        steps = {adsk.core.KeyCodes.PageUpKeyCode: 1, adsk.core.KeyCodes.PageDownKeyCode: -1}
         if args.keyCode not in steps:
             return
         s = self.session
@@ -319,7 +387,7 @@ class Validated(adsk.core.ValidateInputsEventHandler):
         s = self.session
         try:
             args.areInputsValid = (bool(s.controller.feedback.examples) and not s.preview_error
-                                   and s.source_body.isValid and s.source_body.revisionId == s.snapshot.revision
+                                   and adapter.scope_current(s.scope_guards)
                                    and s.input_keys(s.examples_input) == s.controller.feedback.examples
                                    and s.input_keys(s.exclusions_input) == s.controller.feedback.exclusions
                                    and all(s.refs[k].isValid for k in s.chosen_keys()))
@@ -334,7 +402,7 @@ class Executed(adsk.core.CommandEventHandler):
 
     def notify(self, args):
         s = self.session
-        if not s.source_body.isValid or s.source_body.revisionId != s.snapshot.revision:
+        if not adapter.scope_current(s.scope_guards):
             raise RuntimeError('Body changed before confirming the selection.')
         if s.renderer.keys != s.chosen_keys():
             s.draw_preview()
@@ -358,7 +426,8 @@ class Destroyed(adsk.core.CommandEventHandler):
             entities = (tuple(s.refs[k] for k in s.accepted_keys)
                         if s.accepted and completed else s.original)
             if _running:
-                _pending = (s.document, s.source_body, s.snapshot.revision, entities)
+                guards = s.scope_guards if s.accepted and completed else s.original_guards
+                _pending = (s.document, guards, entities)
                 if _pending_timer:
                     _pending_timer.cancel()
                 def queue():
@@ -382,7 +451,7 @@ class ApplySelection(adsk.core.CustomEventHandler):
             return
         app = adsk.core.Application.get()
         ui = app.userInterface
-        document, body, revision, entities = pending
+        document, guards, entities = pending
         _diagnostics.append({'event': 'apply_selection', 'command': ui.activeCommand, 'count': len(entities)})
         # A deferred callback must never overwrite a different document or
         # another tool's selections. No retries that could surprise the user.
@@ -390,7 +459,7 @@ class ApplySelection(adsk.core.CustomEventHandler):
             _diagnostics.append({'event': 'apply_skipped', 'reason': 'context_changed'})
             app.log('Selectra: selection transfer skipped because context changed.')
             return
-        if not body.isValid or body.revisionId != revision or any(not e.isValid for e in entities):
+        if not adapter.scope_current(guards) or any(not e.isValid for e in entities):
             _diagnostics.append({'event': 'apply_skipped', 'reason': 'geometry_changed'})
             app.log('Selectra: selection transfer skipped because geometry changed.')
             return

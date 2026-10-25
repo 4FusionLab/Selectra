@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""Immutable, serializable snapshot of one body occurrence; no live API objects."""
+"""Immutable snapshot of an authorized search domain; no live API objects."""
 from dataclasses import asdict, dataclass, field
 import json
 from math import isfinite
@@ -15,17 +15,20 @@ class BodySnapshot:
     entities: tuple
     links: tuple = ()  # Undirected, same-kind adjacency (edge-edge or face-face).
     wall_pairs: tuple = ()  # Planar pairs with local material evidence (not a volume proof).
+    relations_complete: bool = True  # Optional wall stage; shape/topology remain complete.
     by_key: object = field(init=False, repr=False, compare=False)
     adjacency: object = field(init=False, repr=False, compare=False)
 
     def __post_init__(self):
+        if type(self.relations_complete) is not bool or (not self.relations_complete and self.wall_pairs):
+            raise ValueError('Incomplete wall analysis cannot supply partial wall pairs.')
         if not self.scope_key or not self.revision:
             raise ValueError('Snapshot needs an explicit body scope and revision.')
         entities = tuple(sorted(self.entities, key=lambda d: d.key))
         if len({d.key for d in entities}) != len(entities):
             raise ValueError('Duplicate entity keys.')
         if any(not d.key or d.scope_key != self.scope_key for d in entities):
-            raise ValueError('Every entity must belong to this exact body occurrence.')
+            raise ValueError('Every entity must belong to this exact authorized search domain.')
         if any(d.kind not in ('edge', 'face') or not isfinite(d.measure) or d.measure <= 0 for d in entities):
             raise ValueError('Snapshot entities must have valid kind and positive size.')
         for d in entities:
@@ -69,13 +72,13 @@ class BodySnapshot:
         return keys
 
     def to_dict(self):
-        return {'schema_version': 2, 'scope_key': self.scope_key, 'revision': self.revision,
+        return {'schema_version': 3, 'scope_key': self.scope_key, 'revision': self.revision,
                 'entities': [asdict(d) for d in self.entities], 'links': [list(link) for link in self.links],
-                'wall_pairs': [list(pair) for pair in self.wall_pairs]}
+                'wall_pairs': [list(pair) for pair in self.wall_pairs], 'relations_complete': self.relations_complete}
 
     @classmethod
     def from_dict(cls, data):
-        if data.get('schema_version') not in (1, 2):
+        if data.get('schema_version') not in (1, 2, 3):
             raise ValueError('Unsupported snapshot schema.')
         entities = []
         for row in data['entities']:
@@ -88,7 +91,7 @@ class BodySnapshot:
                     row[key] = tuple(vector)
             entities.append(Descriptor(**row))
         return cls(data['scope_key'], data['revision'], tuple(entities), tuple(data.get('links', ())),
-                   tuple(data.get('wall_pairs', ())))
+                   tuple(data.get('wall_pairs', ())), data.get('relations_complete', True))
 
     def to_json(self):
         return json.dumps(self.to_dict(), ensure_ascii=False, sort_keys=True, allow_nan=False)

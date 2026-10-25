@@ -23,7 +23,7 @@ class Descriptor:
     normal: Optional[Vector] = None  # Oriented normal, planar faces only.
     sides: Optional[int] = None
     loops: Optional[int] = None
-    scope_key: Optional[str] = None  # Opaque identity of one body occurrence snapshot.
+    scope_key: Optional[str] = None  # Opaque identity of the explicitly authorized search domain.
     position: Optional[Vector] = None  # A point on a plane, in the snapshot frame.
     adjacent_faces: Optional[int] = None
     face_angle: Optional[float] = None  # Radians; undefined on boundaries/nonmanifold edges.

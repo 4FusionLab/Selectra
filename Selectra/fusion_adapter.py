@@ -4,6 +4,7 @@ from time import monotonic
 from dataclasses import replace
 from uuid import uuid4
 from math import hypot
+import json
 
 import adsk.core
 import adsk.fusion
@@ -11,6 +12,7 @@ import adsk.fusion
 from .matching import Descriptor
 from .snapshot import BodySnapshot
 from .walls import PlanarPatch, wall_probe_points, confirm_wall
+from .search_scope import merge_snapshots, component_contains, SCOPES
 
 MAX_ENTITIES = 10000
 READ_BUDGET_SECONDS = 2.0
@@ -18,6 +20,46 @@ MAX_TOPOLOGY_LINKS = 100000
 MAX_PLANAR_FACES = 160
 MAX_CONTOUR_POINTS = 512
 CONTOUR_TOLERANCE = 1e-4  # cm: numeric strokes, not exact BRep congruence.
+MAX_SCOPE_BODIES = 128
+SCOPE_BUDGET_SECONDS = 8.0
+
+
+class WallAnalysisUnavailable(RuntimeError):
+    """Optional relations are unavailable; mandatory shape reading may continue."""
+
+
+class ContourBudgetExceeded(ValueError):
+    pass
+
+
+def body_stamp(body):
+    context = body.assemblyContext
+    return body.revisionId, tuple(context.transform2.asArray()) if context else ()
+
+
+def scope_current(guards):
+    return all(body.isValid and body.isVisible and body.isSelectable and body_stamp(body) == stamp for body, stamp in guards)
+
+
+def _world_descriptor(descriptor, context):
+    if context is None:
+        return descriptor
+    matrix = context.transform2
+
+    def point(values):
+        p = adsk.core.Point3D.create(*values)
+        p.transformBy(matrix)
+        return _vector(p)
+
+    def vector(values):
+        v = adsk.core.Vector3D.create(*values)
+        v.transformBy(matrix)
+        return _vector(v)
+
+    return replace(descriptor, position=point(descriptor.position) if descriptor.position else None,
+                   normal=vector(descriptor.normal) if descriptor.normal else None,
+                   direction=vector(descriptor.direction) if descriptor.direction else None,
+                   contours=tuple(tuple(point(p) for p in loop) for loop in descriptor.contours))
 
 
 def _unbroken_material_traces(body, probe, started):
@@ -33,13 +75,13 @@ def _unbroken_material_traces(body, probe, started):
         length = hypot(*delta)
         start = tuple(p-.05*d for p, d in zip(first, delta))
         if monotonic() - started > READ_BUDGET_SECONDS:
-            raise ValueError('Material ray analysis exceeded the time budget.')
+            raise WallAnalysisUnavailable('Material ray analysis exceeded the time budget.')
         hits = adsk.core.ObjectCollection.create()
         entities = body.parentComponent.findBRepUsingRay(
             adsk.core.Point3D.create(*start), adsk.core.Vector3D.create(*delta),
             adsk.fusion.BRepEntityTypes.BRepFaceEntityType, 1e-6, False, hits)
         if not entities or entities.count != hits.count:
-            raise ValueError('Could not read complete material segment intersections.')
+            raise WallAnalysisUnavailable('Could not read complete material segment intersections.')
         endpoint_found = False
         for i in range(entities.count):
             entity = entities.item(i)
@@ -52,11 +94,11 @@ def _unbroken_material_traces(body, probe, started):
             if 2e-6 < distance < length-2e-6:
                 return False
         if not endpoint_found:
-            raise ValueError('Material ray did not reach the opposite trimmed face.')
+            raise WallAnalysisUnavailable('Material ray did not reach the opposite trimmed face.')
     return True
 
 
-def _contours(face):
+def _contours(face, stroke_tolerance=CONTOUR_TOLERANCE):
     """Read coedge-oriented trimmed loops; never use the untrimmed surface."""
     loops, count = [], 0
     for i in range(face.loops.count):
@@ -69,7 +111,7 @@ def _contours(face):
             ok, low, high = evaluator.getParameterExtents()
             if not ok:
                 raise ValueError('Could not read the trimmed boundary parameter range.')
-            ok, stroke = evaluator.getStrokes(low, high, CONTOUR_TOLERANCE)
+            ok, stroke = evaluator.getStrokes(low, high, stroke_tolerance)
             if not ok or len(stroke) < 2:
                 raise ValueError('Could not read the complete trimmed boundary.')
             stroke = list(stroke)
@@ -84,7 +126,7 @@ def _contours(face):
             previous_end = end
             count += len(stroke)-1
             if count > MAX_CONTOUR_POINTS:
-                raise ValueError('Trimmed boundary exceeds the contour analysis budget.')
+                raise ContourBudgetExceeded('Trimmed boundary exceeds the contour analysis budget.')
         if not points or hypot(*(a-b for a, b in zip(previous_end, points[0]))) > 1e-6:
             raise ValueError('Trimmed boundary is not closed.')
         loops.append((not loop.isOuter, tuple(points)))
@@ -105,6 +147,11 @@ def _vector(vector):
 
 
 def describe(entity):
+    # Numeric extraction and material queries use component-local native data.
+    # Live references keep their exact occurrence; the snapshot is transformed
+    # to world coordinates only after local relationships are confirmed.
+    if entity.assemblyContext is not None:
+        entity = entity.nativeObject
     entity_kind = kind(entity)
     geometry = entity.geometry
     family = geometry.objectType.rsplit('::', 1)[-1]
@@ -129,7 +176,14 @@ def describe(entity):
             sign = -1 if entity.isParamReversed else 1
             normal = tuple(sign * x for x in _vector(geometry.normal))
             position = _vector(geometry.origin)
-            contours = _contours(entity)
+            # Scale the stroke deviation far below the 1% matching tolerance;
+            # fixed micron strokes over-sample large project geometry.
+            for factor in (1, 4, 16):
+                try:
+                    contours = _contours(entity, max(CONTOUR_TOLERANCE, perimeter*1e-5)*factor)
+                    break
+                except ContourBudgetExceeded:
+                    continue
         elif family == 'cylinder':
             direction = _vector(geometry.axis)
     else:
@@ -159,10 +213,8 @@ def read_scope(entities):
     if len({kind(e) for e in entities}) != 1:
         raise ValueError('Use only edges or only faces in this prototype.')
     body = entities[0].body
-    if any(e.assemblyContext is not None or e.body != body for e in entities):
-        raise ValueError('This prototype searches one root-component body at a time.')
-    if body.parentComponent != design.rootComponent:
-        raise ValueError('Component occurrences are planned; select a root-component body for now.')
+    if any(e.body != body for e in entities):
+        raise ValueError('Initial examples must belong to one body occurrence.')
     if not body.isVisible or not body.isSelectable:
         raise ValueError('The selected body must be visible and selectable.')
     examples = tuple(describe(e) for e in entities)
@@ -188,7 +240,7 @@ def read_scope(entities):
     return tuple(unique.values()), tuple(descriptors), references, skipped
 
 
-def read_snapshot(entities):
+def read_snapshot(entities, *, include_relations=True):
     """Prepare same-body topology for the pure command controller.
 
     Native extraction is source-prepared only until Fusion CAD acceptance.
@@ -199,6 +251,8 @@ def read_snapshot(entities):
     total_started = monotonic()
     source_body = entities[0].body
     revision = source_body.revisionId
+    stamp = body_stamp(source_body)
+    analysis_body = source_body.nativeObject if source_body.assemblyContext else source_body
     examples, pool, refs, skipped = read_scope(entities)
     read_seconds = monotonic() - total_started
     scope = uuid4().hex
@@ -224,36 +278,128 @@ def read_snapshot(entities):
     if source_body.revisionId != revision:
         raise ValueError('Geometry changed while reading the body. Please retry.')
     wall_pairs = []
+    relations_complete = include_relations and all(d.contours for d in scoped if d.geometry == 'plane')
     topology_seconds = monotonic() - started
     relationship_started = monotonic()
     patches = [PlanarPatch(d.key, d.normal, d.position, d.contours)
                for d in scoped if d.geometry == 'plane' and d.contours]
     if len(patches) > MAX_PLANAR_FACES:
-        raise ValueError('Planar relationship analysis exceeds the body budget (160 faces).')
-    for index, patch in enumerate(patches):
+        relations_complete = False
+    for index, patch in enumerate(patches if relations_complete else ()):
+        if not relations_complete:
+            break
         for other in patches[index+1:]:
             if monotonic() - started > READ_BUDGET_SECONDS:
-                raise ValueError('Wall relationship analysis exceeded the time budget.')
+                relations_complete = False
+                break
             probe = wall_probe_points(patch, other)
             if not probe.complete:
-                raise ValueError('Wall relationship analysis is incomplete: ' + probe.reason)
+                relations_complete = False
+                break
             if not probe.points:
                 continue
             material = []
             for point in probe.points:
                 if monotonic() - started > READ_BUDGET_SECONDS:
-                    raise ValueError('Material confirmation exceeded the time budget.')
-                material.append(source_body.pointContainment(adsk.core.Point3D.create(*point))
+                    relations_complete = False
+                    break
+                material.append(analysis_body.pointContainment(adsk.core.Point3D.create(*point))
                                 == adsk.fusion.PointContainment.PointInsidePointContainment)
-            if confirm_wall(probe, material) is not None and _unbroken_material_traces(source_body, probe, started):
-                wall_pairs.append((patch.key, other.key))
+            if not relations_complete:
+                break
+            if confirm_wall(probe, material) is not None:
+                try:
+                    if _unbroken_material_traces(analysis_body, probe, started):
+                        wall_pairs.append((patch.key, other.key))
+                except WallAnalysisUnavailable:
+                    relations_complete = False
+                    break
     if monotonic() - started > READ_BUDGET_SECONDS:
-        raise ValueError('Wall relationship analysis exceeded the time budget.')
-    if not source_body.isValid or source_body.revisionId != revision:
+        relations_complete = False
+    if not source_body.isValid or body_stamp(source_body) != stamp:
         raise ValueError('Geometry changed during relationship analysis. Please retry.')
-    snapshot = BodySnapshot(scope, revision, scoped, tuple(links), tuple(wall_pairs))
+    scoped = tuple(_world_descriptor(d, source_body.assemblyContext) for d in scoped)
+    snapshot_revision = json.dumps(stamp) if source_body.assemblyContext else revision
+    snapshot = BodySnapshot(scope, snapshot_revision, scoped, tuple(links), tuple(wall_pairs) if relations_complete else (), relations_complete)
     snapshot.require_keys(d.key for d in examples)
+    if body_stamp(source_body) != stamp:
+        raise ValueError('Body occurrence moved during geometry reading. Please retry.')
     read_snapshot.last_timings = {'brep_seconds': read_seconds, 'topology_seconds': topology_seconds,
                                   'relationships_seconds': monotonic()-relationship_started,
                                   'total_read_seconds': monotonic()-total_started}
     return snapshot, tuple(d.key for d in examples), refs, skipped, source_body
+
+
+def read_search_scope(entities, mode='component'):
+    if mode not in dict(SCOPES) or not entities:
+        raise ValueError('Choose a valid search scope and an example.')
+    if any(not e.isValid or not kind(e) or kind(e) != kind(entities[0]) for e in entities):
+        raise ValueError('Select only BRep faces or only BRep edges.')
+    source = entities[0].body
+    design = adsk.fusion.Design.cast(adsk.core.Application.get().activeProduct)
+    if source.assemblyContext is None and source.parentComponent != design.rootComponent:
+        context = design.activeOccurrence
+        if context is None or context.component != source.parentComponent:
+            raise ValueError('Select the body in its assembly instance.')
+        entities = tuple(e.createForAssemblyContext(context)
+                         if e.assemblyContext is None and e.body.parentComponent == context.component else e
+                         for e in entities)
+        source = entities[0].body
+    bodies = [source]
+    if mode == 'component':
+        collection = source.assemblyContext.bRepBodies if source.assemblyContext else source.parentComponent.bRepBodies
+        candidates = list(collection)
+        context = source.assemblyContext
+        for occurrence in design.rootComponent.allOccurrences:
+            if occurrence.isVisible and component_contains(context.fullPathName if context else None, occurrence.fullPathName):
+                candidates.extend(occurrence.bRepBodies)
+    elif mode == 'all':
+        candidates = list(design.rootComponent.bRepBodies)
+        for occurrence in design.rootComponent.allOccurrences:
+            if occurrence.isVisible:
+                candidates.extend(occurrence.bRepBodies)
+    else:
+        candidates = []
+    for body in candidates:
+        if body.isVisible and body.isSelectable and not any(body == known for known in bodies):
+            bodies.append(body)
+    if len(bodies) > MAX_SCOPE_BODIES:
+        raise ValueError('Search scope exceeds 128 visible bodies. Choose a smaller scope.')
+    started, snapshots, refs_by_body, guards, skipped, totals = monotonic(), [], [], [], 0, {}
+    relations_available = True
+    for body in bodies:
+        if monotonic()-started > SCOPE_BUDGET_SECONDS:
+            raise ValueError('Search scope analysis exceeded its time budget. No partial result was applied.')
+        collection = body.faces if kind(entities[0]) == 'face' else body.edges
+        seed = next((e for e in collection if kind(e) != 'edge' or not e.isDegenerate), None)
+        if seed is None:
+            continue
+        local_examples = tuple(e for e in entities if e.body == body)
+        snap, _, references, omitted, _ = read_snapshot(local_examples or (seed,), include_relations=relations_available)
+        relations_available = relations_available and snap.relations_complete
+        snapshots.append(snap)
+        refs_by_body.append(references)
+        guards.append((body, body_stamp(body)))
+        skipped += omitted
+        for key, value in read_snapshot.last_timings.items():
+            totals[key] = totals.get(key, 0) + value
+        if sum(len(s.entities) for s in snapshots) > MAX_ENTITIES:
+            raise ValueError('Search scope exceeds 10,000 entities. No partial result was applied.')
+        if sum(len(s.links) for s in snapshots) > MAX_TOPOLOGY_LINKS:
+            raise ValueError('Search scope topology exceeds the analysis budget.')
+    if not scope_current(guards) or monotonic()-started > SCOPE_BUDGET_SECONDS:
+        raise ValueError('Search scope changed or exceeded its analysis budget. Please retry.')
+    if len(snapshots) == 1:
+        snapshot, references = snapshots[0], refs_by_body[0]
+        maps = ({key: key for key in references},)
+    else:
+        snapshot, maps = merge_snapshots(snapshots, uuid4().hex, json.dumps([s.revision for s in snapshots]))
+        references = {maps[i][key]: entity for i, refs in enumerate(refs_by_body) for key, entity in refs.items()}
+    keys = []
+    for entity in entities:
+        owner = next((i for i, (body, _) in enumerate(guards) if entity.body == body), None)
+        if owner is None:
+            raise ValueError('Examples are outside this scope. Start within one component, then choose All Components.')
+        keys.append(maps[owner][str(entity.tempId)])
+    read_search_scope.last_timings = totals
+    return snapshot, tuple(keys), references, skipped, source, tuple(guards)
