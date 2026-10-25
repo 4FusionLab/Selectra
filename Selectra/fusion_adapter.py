@@ -62,6 +62,7 @@ def _contours(face):
     for i in range(face.loops.count):
         loop = face.loops.item(i)
         points = []
+        previous_end = None
         for j in range(loop.coEdges.count):
             coedge = loop.coEdges.item(j)
             evaluator = coedge.edge.evaluator
@@ -72,12 +73,20 @@ def _contours(face):
             if not ok or len(stroke) < 2:
                 raise ValueError('Could not read the complete trimmed boundary.')
             stroke = list(stroke)
-            if coedge.isOpposedToEdge:
+            # The curve evaluator's parameter order can oppose the BRep
+            # edge direction. Compose BOTH reversals to follow the coedge.
+            if coedge.isOpposedToEdge != coedge.edge.isParamReversed:
                 stroke.reverse()
+            start, end = _vector(stroke[0]), _vector(stroke[-1])
+            if previous_end is not None and hypot(*(a-b for a, b in zip(previous_end, start))) > 1e-6:
+                raise ValueError('Trimmed boundary segments do not form a continuous loop.')
             points.extend(_vector(p) for p in stroke[:-1])
+            previous_end = end
             count += len(stroke)-1
             if count > MAX_CONTOUR_POINTS:
                 raise ValueError('Trimmed boundary exceeds the contour analysis budget.')
+        if not points or hypot(*(a-b for a, b in zip(previous_end, points[0]))) > 1e-6:
+            raise ValueError('Trimmed boundary is not closed.')
         loops.append((not loop.isOuter, tuple(points)))
     loops.sort(key=lambda item: item[0])
     return tuple(points for _, points in loops)
