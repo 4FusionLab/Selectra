@@ -1,14 +1,18 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Bounded read-only BRep snapshots. Initial spike: one root-component body."""
 from time import monotonic
+from dataclasses import replace
+from uuid import uuid4
 
 import adsk.core
 import adsk.fusion
 
 from .matching import Descriptor
+from .snapshot import BodySnapshot
 
 MAX_ENTITIES = 10000
 READ_BUDGET_SECONDS = 2.0
+MAX_TOPOLOGY_LINKS = 100000
 
 
 def kind(entity):
@@ -54,7 +58,8 @@ def describe(entity):
         radius = geometry.radius
     # tempId is only session-local and only used within this unchanged body.
     return Descriptor(str(entity.tempId), entity_kind, family, measure,
-                      perimeter, radius, direction, normal, sides, loops)
+                      perimeter, radius, direction, normal, sides, loops,
+                      adjacent_faces=entity.faces.count if entity_kind == 'edge' else None)
 
 
 def read_scope(entities):
@@ -99,3 +104,41 @@ def read_scope(entities):
             raise ValueError('Analysis exceeded the prototype time budget. No partial result was applied.')
     unique = {d.key: d for d in examples}
     return tuple(unique.values()), tuple(descriptors), references, skipped
+
+
+def read_snapshot(entities):
+    """Prepare same-body topology for the pure command controller.
+
+    Native extraction is source-prepared only until Fusion CAD acceptance.
+    Each opaque scope is local to this command, never an entityToken hash.
+    """
+    if not entities:
+        raise ValueError('Select an edge or a face first.')
+    source_body = entities[0].body
+    revision = source_body.revisionId
+    examples, pool, refs, skipped = read_scope(entities)
+    scope = uuid4().hex
+    scoped = tuple(replace(d, scope_key=scope) for d in pool)
+    links, started = set(), monotonic()
+    for key, entity in refs.items():
+        if monotonic() - started > READ_BUDGET_SECONDS:
+            raise ValueError('Topology read exceeded the prototype time budget.')
+        if kind(entity) == 'edge':
+            neighbours = (vertex.edges for vertex in (entity.startVertex, entity.endVertex) if vertex)
+        else:
+            neighbours = (entity.edges.item(i).faces for i in range(entity.edges.count))
+        for collection in neighbours:
+            for i in range(collection.count):
+                if monotonic() - started > READ_BUDGET_SECONDS:
+                    raise ValueError('Topology read exceeded the prototype time budget.')
+                other = collection.item(i)
+                other_key = str(other.tempId)
+                if other.body == source_body and other_key in refs and other_key != key:
+                    links.add(tuple(sorted((key, other_key))))
+                    if len(links) > MAX_TOPOLOGY_LINKS:
+                        raise ValueError('Topology is too dense for the prototype budget.')
+    if source_body.revisionId != revision:
+        raise ValueError('Geometry changed while reading the body. Please retry.')
+    snapshot = BodySnapshot(scope, revision, scoped, tuple(links))
+    snapshot.require_keys(d.key for d in examples)
+    return snapshot, tuple(d.key for d in examples), refs, skipped, source_body

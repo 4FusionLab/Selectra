@@ -2,12 +2,16 @@
 """Native context-menu spike. Requires real Fusion acceptance before release."""
 import html
 import traceback
+from collections import deque
+from threading import Timer
 
 import adsk.core
 import adsk.fusion
 
 from . import fusion_adapter as adapter
-from .matching import Tolerance, infer
+from .matching import Tolerance
+from .selection import SelectionSession
+from .highlight import HighlightRenderer
 
 COMMAND_ID = 'DiegoV_Selectra_SelectSimilar'
 EVENT_ID = 'DiegoV_Selectra_ApplySelection'
@@ -16,15 +20,21 @@ _sessions = []
 _pending = None
 _event_registered = False
 _running = False
+_diagnostics = deque(maxlen=100)
+_pending_timer = None
+_launch_context = None
 
 
 def _bind(event, handler, bindings):
-    event.add(handler)
+    if not event.add(handler):
+        raise RuntimeError('Could not subscribe to ' + type(event).__name__)
     bindings.append((event, handler))
 
 
 def _log():
-    adsk.core.Application.get().log('Selectra: ' + traceback.format_exc())
+    detail = traceback.format_exc()
+    _diagnostics.append({'error': detail})
+    adsk.core.Application.get().log('Selectra: ' + detail)
 
 
 def _active_entities(ui):
@@ -33,74 +43,105 @@ def _active_entities(ui):
 
 
 class Session:
-    def __init__(self, command):
+    def __init__(self, command, preselected=None):
         self.app = adsk.core.Application.get()
         self.document = self.app.activeDocument
-        self.original = _active_entities(self.app.userInterface)
-        self.command = command
-        self.bindings = []
-        self.accepted = False
+        self.original = tuple(preselected) if preselected is not None else _active_entities(self.app.userInterface)
+        self.command, self.bindings = command, []
+        self.accepted, self.accepted_keys = False, ()
+        self.preview_error = ''
         self.updating = False
-        self.inference = None
-        self.examples, self.pool, self.refs, self.skipped = adapter.read_scope(self.original)
+        self.snapshot, examples, self.refs, self.skipped, self.source_body = adapter.read_snapshot(self.original)
+        self.controller = SelectionSession(self.snapshot, examples)
+        self.renderer = HighlightRenderer(self.source_body, self.snapshot.revision)
         command.isRepeatable = False
         command.isExecutedWhenPreEmpted = False
-        command.okButtonText = 'Select'
+        command.okButtonText = 'OK'
+        command.setDialogInitialSize(360, 380)
         inputs = command.commandInputs
-        self.info = inputs.addTextBoxCommandInput('selectra_info', '', '', 3, True)
+        self.info = inputs.addTextBoxCommandInput('selectra_info', '', '', 2, True)
         self.info.isFullWidth = True
-        self.result = inputs.addSelectionInput('selectra_result', 'Preview', 'Proposed selection')
-        self.result.addSelectionFilter('Edges' if self.examples[0].kind == 'edge' else 'Faces')
-        self.result.setSelectionLimits(0, 0)
-        self.result.tooltip = 'Review the highlighted result. To change examples, cancel and select another example.'
+        selection_filter = 'Edges' if self.snapshot.entities[0].kind == 'edge' else 'Faces'
+        self.examples_input = inputs.addSelectionInput('selectra_examples', 'Examples', 'Add another example from this body')
+        self.examples_input.addSelectionFilter(selection_filter)
+        self.examples_input.setSelectionLimits(1, 0)
+        self.exclusions_input = inputs.addSelectionInput('selectra_exclusions', 'Exclude', 'Show an item that should not be included')
+        self.exclusions_input.addSelectionFilter(selection_filter)
+        self.exclusions_input.setSelectionLimits(0, 0)
+        self.range_input = inputs.addIntegerSliderCommandInput(
+            'selectra_range', 'Similarity', 0, max(1, len(self.controller.ranking.tiers)), False)
+        self.range_input.setText('Closest', 'Broader')
+        self.range_input.tooltip = 'Include less similar items with PgUp; remove the least similar items with PgDown.'
+        hint = inputs.addTextBoxCommandInput('selectra_hint', '', 'PgUp: more | PgDown: fewer', 1, True)
+        hint.isFullWidth = True
         group = inputs.addGroupCommandInput('selectra_refine', 'Refine')
         group.isExpanded = False
         children = group.children
-        style = adsk.core.DropDownStyles.TextListDropDownStyle
-        self.tolerance = children.addDropDownCommandInput('selectra_tolerance', 'Similarity', style)
-        for label in ('Tight', 'Balanced', 'Broad'):
-            self.tolerance.listItems.add(label, label == 'Balanced', '')
-        self.interpretation = children.addDropDownCommandInput('selectra_interpretation', 'Interpretation', style)
-        self._calculate()
+        self.criterion_options = [('auto', 'Automatic'),
+            ('measure', 'Length' if self.snapshot.entities[0].kind == 'edge' else 'Area')]
+        for key, label in (('direction', 'Direction'), ('normal', 'Orientation'),
+                           ('radius', 'Radius'), ('perimeter', 'Perimeter')):
+            if all(getattr(self.snapshot.by_key[k], key) is not None for k in examples):
+                self.criterion_options.append((key, label))
+        self.criterion_input = children.addDropDownCommandInput(
+            'selectra_criterion', 'Match', adsk.core.DropDownStyles.TextListDropDownStyle)
+        for key, label in self.criterion_options:
+            self.criterion_input.listItems.add(label, key == 'auto', '')
+        self.reset_input = children.addBoolValueInput('selectra_reset', 'Reset Range', False, '', False)
+        self.sync_controls()
         _bind(command.activate, Activated(self), self.bindings)
         _bind(command.inputChanged, Changed(self), self.bindings)
-        _bind(command.preSelect, PreviewOnly(), self.bindings)
+        _bind(command.preSelect, AllowedSelection(self), self.bindings)
+        _bind(command.keyDown, KeyPressed(self), self.bindings)
+        _bind(command.executePreview, Previewed(self), self.bindings)
         _bind(command.validateInputs, Validated(self), self.bindings)
         _bind(command.execute, Executed(self), self.bindings)
         _bind(command.destroy, Destroyed(self), self.bindings)
 
-    def _calculate(self):
-        self.updating = True
+    def sync_controls(self):
+        previous, self.updating = self.updating, True
         try:
-            values = {'Tight': .001, 'Balanced': .01, 'Broad': .05}
-            relative = values[self.tolerance.selectedItem.name]
-            self.inference = infer(self.examples, self.pool, Tolerance(relative=relative))
-            self.interpretation.listItems.clear()
-            for i, proposal in enumerate(self.inference.proposals):
-                self.interpretation.listItems.add(proposal.label, i == 0, '')
-            if not self.inference.proposals:
-                self.interpretation.listItems.add('No additional matches', True, '')
-            self.interpretation.isEnabled = len(self.inference.proposals) > 1
+            maximum = max(1, len(self.controller.ranking.tiers))
+            self.range_input.valueOne = min(self.range_input.valueOne, maximum)
+            self.range_input.maximumValue = maximum
+            self.range_input.valueOne = self.controller.level
+            self.range_input.isEnabled = bool(self.controller.feedback.examples and self.controller.ranking.tiers)
         finally:
-            self.updating = False
+            self.updating = previous
 
     def chosen_keys(self):
-        if not self.inference.proposals:
-            return tuple(d.key for d in self.examples)
-        return self.inference.proposals[self.interpretation.selectedItem.index].keys
+        return self.controller.result
+
+    def input_keys(self, control):
+        entities = tuple(control.selection(i).entity for i in range(control.selectionCount))
+        if any(e.body != self.source_body or e.assemblyContext is not None for e in entities):
+            raise ValueError('Examples and exclusions must belong to the original body.')
+        return self.snapshot.require_keys(str(e.tempId) for e in entities)
 
     def preview(self):
-        self.result.clearSelection()
-        keys = self.chosen_keys()
-        for key in keys:
-            entity = self.refs[key]
-            if not entity.isValid or not self.result.addSelection(entity):
-                raise RuntimeError('A preview entity is no longer selectable. Cancel and retry.')
-        summary = self.inference.explanation
-        if self.skipped:
-            summary += ' {} unsupported entities skipped.'.format(self.skipped)
-        self.info.text = html.escape('{} items, including {} examples. {}'.format(
-            len(keys), len(self.examples), summary))
+        self.preview_error = ''
+        self.sync_controls()
+        if not self.controller.feedback.examples:
+            self.renderer.clear()
+            self.info.text = 'Select an example on ' + html.escape(self.source_body.name) + '.'
+        # CommandInput changes schedule Fusion's own preview pass. Requesting
+        # a second pass here rolls back/redraws the overlay twice per gesture.
+
+    def draw_preview(self):
+        if not self.source_body.isValid or self.source_body.revisionId != self.snapshot.revision:
+            raise RuntimeError('Body geometry changed. Cancel and restart Select Similar.')
+        previous, self.updating = self.updating, True
+        try:
+            keys = self.chosen_keys()
+            self.renderer.show(self.refs, keys)
+            self.preview_error = ''
+            noun = 'edges' if self.snapshot.entities[0].kind == 'edge' else 'faces'
+            status = '{} of {} {} · {}'.format(len(keys), len(self.snapshot.entities), noun, self.source_body.name)
+            if self.controller.ranking.ambiguous:
+                status += '<br>Add an example or exclude an unwanted item.'
+            self.info.text = status
+        finally:
+            self.updating = previous
 
 
 class Menu(adsk.core.MarkingMenuEventHandler):
@@ -108,25 +149,43 @@ class Menu(adsk.core.MarkingMenuEventHandler):
         try:
             app = adsk.core.Application.get()
             ui = app.userInterface
+            _diagnostics.append({'event': 'menu', 'command': ui.activeCommand,
+                                 'selection_count': ui.activeSelections.count})
             if ui.activeCommand != 'SelectCommand' or not adsk.fusion.Design.cast(app.activeProduct):
                 return
             entities = _active_entities(ui)
             if entities and all(adapter.kind(e) for e in entities):
                 if len({adapter.kind(e) for e in entities}) == 1:
                     args.linearMarkingMenu.controls.addCommand(ui.commandDefinitions.itemById(COMMAND_ID))
+                    _diagnostics.append({'event': 'menu_added'})
         except Exception:
             _log()
 
 
+class Starting(adsk.core.ApplicationCommandEventHandler):
+    def notify(self, args):
+        global _launch_context
+        if args.commandId == COMMAND_ID:
+            app = adsk.core.Application.get()
+            _launch_context = (app.activeDocument, _active_entities(app.userInterface))
+
+
 class Created(adsk.core.CommandCreatedEventHandler):
     def notify(self, args):
+        global _launch_context
+        _diagnostics.append({'event': 'created'})
         try:
-            session = Session(args.command)
+            context, _launch_context = _launch_context, None
+            selected = context[1] if context and context[0] == adsk.core.Application.get().activeDocument else None
+            session = Session(args.command, selected)
             _sessions.append(session)
+            _diagnostics.append({'event': 'session_ready', 'examples': session.controller.feedback.examples})
         except Exception as error:
             _log()
-            adsk.core.Application.get().userInterface.messageBox(str(error), 'Selectra')
-            # A no-input command auto-terminates. No model mutation is made.
+            args.command.commandInputs.addTextBoxCommandInput(
+                'selectra_error', '', html.escape(str(error)), 4, True)
+            args.command.isOKButtonVisible = False
+            args.command.isExecutedWhenPreEmpted = False
 
 
 class Activated(adsk.core.CommandEventHandler):
@@ -135,10 +194,18 @@ class Activated(adsk.core.CommandEventHandler):
         self.session = session
 
     def notify(self, args):
+        _diagnostics.append({'event': 'activate'})
         try:
+            self.session.updating = True
+            self.session.examples_input.clearSelection()
+            for key in self.session.controller.feedback.examples:
+                if not self.session.examples_input.addSelection(self.session.refs[key]):
+                    raise RuntimeError('Could not restore an example.')
             self.session.preview()
         except Exception:
             _log()
+        finally:
+            self.session.updating = False
 
 
 class Changed(adsk.core.InputChangedEventHandler):
@@ -151,17 +218,82 @@ class Changed(adsk.core.InputChangedEventHandler):
         if s.updating:
             return
         try:
-            if args.input.id == 'selectra_tolerance':
-                s._calculate()
-            if args.input.id in ('selectra_tolerance', 'selectra_interpretation'):
-                s.preview()
-        except Exception:
+            key = args.input.id
+            if key == 'selectra_range':
+                s.controller.set_level(s.range_input.valueOne)
+            elif key == 'selectra_criterion':
+                s.controller.set_criterion(s.criterion_options[s.criterion_input.selectedItem.index][0])
+            elif key == 'selectra_examples':
+                s.controller.replace_examples(s.input_keys(s.examples_input))
+            elif key == 'selectra_exclusions':
+                s.controller.replace_exclusions(s.input_keys(s.exclusions_input))
+            elif key == 'selectra_reset':
+                s.controller.reset_preview()
+            else:
+                return
+            s.preview()
+        except Exception as error:
+            s.info.text = html.escape(str(error))
             _log()
 
 
-class PreviewOnly(adsk.core.SelectionEventHandler):
+class AllowedSelection(adsk.core.SelectionEventHandler):
+    def __init__(self, session):
+        super().__init__()
+        self.session = session
+
     def notify(self, args):
-        args.isSelectable = False
+        try:
+            control, entity = args.activeInput, args.selection.entity
+            s = self.session
+            valid = (entity.isValid
+                     and adapter.kind(entity) == s.snapshot.entities[0].kind
+                     and entity.body == s.source_body and entity.assemblyContext is None)
+            key = str(entity.tempId) if valid else None
+            if control.id == 'selectra_examples' and key in s.controller.feedback.exclusions:
+                valid = False
+            if control.id == 'selectra_exclusions' and key in s.controller.feedback.examples:
+                valid = False
+            args.isSelectable = valid and key in s.refs
+        except Exception:
+            args.isSelectable = False
+
+
+class KeyPressed(adsk.core.KeyboardEventHandler):
+    def __init__(self, session):
+        super().__init__()
+        self.session = session
+
+    def notify(self, args):
+        if args.modifierMask:
+            return
+        steps = {adsk.core.KeyCodes.PageUpKeyCode: 1, adsk.core.KeyCodes.PageDownKeyCode: -1}
+        if args.keyCode not in steps:
+            return
+        s = self.session
+        try:
+            s.controller.adjust_similarity(steps[args.keyCode])
+            _diagnostics.append({'event': 'similarity_key', 'key': args.keyCode,
+                                 'level': s.controller.level, 'count': len(s.chosen_keys())})
+            s.preview()
+        except Exception as error:
+            s.info.text = html.escape(str(error))
+            _log()
+
+
+class Previewed(adsk.core.CommandEventHandler):
+    def __init__(self, session):
+        super().__init__()
+        self.session = session
+
+    def notify(self, args):
+        args.isValidResult = False
+        try:
+            self.session.draw_preview()
+        except Exception as error:
+            self.session.preview_error = str(error)
+            self.session.info.text = html.escape(str(error))
+            _log()
 
 
 class Validated(adsk.core.ValidateInputsEventHandler):
@@ -171,9 +303,14 @@ class Validated(adsk.core.ValidateInputsEventHandler):
 
     def notify(self, args):
         s = self.session
-        args.areInputsValid = (bool(s.inference.proposals)
-                               and s.result.selectionCount == len(s.chosen_keys())
-                               and all(s.refs[k].isValid for k in s.chosen_keys()))
+        try:
+            args.areInputsValid = (bool(s.controller.feedback.examples) and not s.preview_error
+                                   and s.source_body.isValid and s.source_body.revisionId == s.snapshot.revision
+                                   and s.input_keys(s.examples_input) == s.controller.feedback.examples
+                                   and s.input_keys(s.exclusions_input) == s.controller.feedback.exclusions
+                                   and all(s.refs[k].isValid for k in s.chosen_keys()))
+        except Exception:
+            args.areInputsValid = False
 
 
 class Executed(adsk.core.CommandEventHandler):
@@ -182,7 +319,14 @@ class Executed(adsk.core.CommandEventHandler):
         self.session = session
 
     def notify(self, args):
-        self.session.accepted = True
+        s = self.session
+        if not s.source_body.isValid or s.source_body.revisionId != s.snapshot.revision:
+            raise RuntimeError('Body changed before confirming the selection.')
+        if s.renderer.keys != s.chosen_keys():
+            s.draw_preview()
+        s.accepted_keys = tuple(s.chosen_keys())
+        s.accepted = True
+        _diagnostics.append({'event': 'execute', 'keys': s.accepted_keys})
 
 
 class Destroyed(adsk.core.CommandEventHandler):
@@ -191,17 +335,24 @@ class Destroyed(adsk.core.CommandEventHandler):
         self.session = session
 
     def notify(self, args):
-        global _pending
+        global _pending, _pending_timer
         s = self.session
         try:
+            _diagnostics.append({'event': 'destroy', 'reason': args.terminationReason})
+            s.renderer.clear()
             completed = args.terminationReason == adsk.core.CommandTerminationReason.CompletedTerminationReason
-            entities = (tuple(s.refs[k] for k in s.chosen_keys())
+            entities = (tuple(s.refs[k] for k in s.accepted_keys)
                         if s.accepted and completed else s.original)
             if _running:
-                _pending = (s.document, entities)
-                if not s.app.fireCustomEvent(EVENT_ID):
-                    _pending = None
-                    s.app.log('Selectra: could not queue selection transfer.')
+                _pending = (s.document, s.source_body, s.snapshot.revision, entities)
+                if _pending_timer:
+                    _pending_timer.cancel()
+                def queue():
+                    queued = s.app.fireCustomEvent(EVENT_ID)
+                    _diagnostics.append({'event': 'transfer_queued', 'return_value': queued})
+                _pending_timer = Timer(.05, queue)
+                _pending_timer.daemon = True
+                _pending_timer.start()
         finally:
             if s in _sessions:
                 _sessions.remove(s)
@@ -217,13 +368,16 @@ class ApplySelection(adsk.core.CustomEventHandler):
             return
         app = adsk.core.Application.get()
         ui = app.userInterface
-        document, entities = pending
+        document, body, revision, entities = pending
+        _diagnostics.append({'event': 'apply_selection', 'command': ui.activeCommand, 'count': len(entities)})
         # A deferred callback must never overwrite a different document or
         # another tool's selections. No retries that could surprise the user.
         if app.activeDocument != document or ui.activeCommand != 'SelectCommand':
+            _diagnostics.append({'event': 'apply_skipped', 'reason': 'context_changed'})
             app.log('Selectra: selection transfer skipped because context changed.')
             return
-        if any(not e.isValid for e in entities):
+        if not body.isValid or body.revisionId != revision or any(not e.isValid for e in entities):
+            _diagnostics.append({'event': 'apply_skipped', 'reason': 'geometry_changed'})
             app.log('Selectra: selection transfer skipped because geometry changed.')
             return
         previous = _active_entities(ui)
@@ -233,6 +387,7 @@ class ApplySelection(adsk.core.CustomEventHandler):
             for entity in entities:
                 if not ui.activeSelections.add(entity):
                     raise RuntimeError('Could not apply the complete selection.')
+            _diagnostics.append({'event': 'apply_completed', 'count': ui.activeSelections.count})
         except Exception:
             ui.activeSelections.clear()
             for entity in previous:
@@ -251,6 +406,7 @@ def run(context):
         definition = ui.commandDefinitions.addButtonDefinition(
             COMMAND_ID, 'Select Similar', 'Find similar edges or faces from your selection.')
         _bind(definition.commandCreated, Created(), _bindings)
+        _bind(ui.commandStarting, Starting(), _bindings)
         _bind(ui.markingMenuDisplaying, Menu(), _bindings)
         event = app.registerCustomEvent(EVENT_ID)
         if not event:
@@ -264,10 +420,16 @@ def run(context):
 
 
 def stop(context):
-    global _pending, _event_registered, _running
+    global _pending, _event_registered, _running, _pending_timer, _launch_context
     app = adsk.core.Application.get()
     _running = False
     _pending = None
+    _launch_context = None
+    if _pending_timer:
+        _pending_timer.cancel()
+        _pending_timer = None
+    for session in tuple(_sessions):
+        session.renderer.clear()
     for event, handler in reversed(_bindings):
         event.remove(handler)
     _bindings.clear()

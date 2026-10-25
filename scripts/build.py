@@ -11,14 +11,14 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def source_files(root):
-    files = {root / name for name in ('.gitignore', '.gitattributes', '.editorconfig', 'LICENSE')}
+    files = {root / name for name in ('.gitignore', '.gitattributes', '.editorconfig', 'LICENSE', 'selectra.png')}
     files.update(root.glob('*.md'))
     patterns = {'Selectra': ('*.py', '*.manifest'), 'scripts': ('*.py',),
                 'tests': ('*.py',), 'docs': ('*.md',), '.github': ('*.yml', '*.md')}
     for directory, globs in patterns.items():
         for pattern in globs:
             files.update((root / directory).rglob(pattern))
-    return sorted((p for p in files if '__pycache__' not in p.parts),
+    return sorted((p for p in files if not {'__pycache__', '.vscode', '.venv', '.git'} & set(p.parts)),
                   key=lambda p: p.relative_to(root).as_posix())
 
 
@@ -42,7 +42,10 @@ def build(root=ROOT, output=None):
             info = zipfile.ZipInfo(path.relative_to(root).as_posix(), (2026, 1, 1, 0, 0, 0))
             info.create_system = 3
             info.external_attr = 0o100644 << 16
-            zipped.writestr(info, path.read_bytes().replace(b'\r\n', b'\n'))
+            content = path.read_bytes()
+            if path.suffix != '.png':
+                content = content.replace(b'\r\n', b'\n')
+            zipped.writestr(info, content)
     checksum = archive.with_suffix('.zip.sha256')
     digest = hashlib.sha256(archive.read_bytes()).hexdigest()
     checksum.write_text(digest + '  ' + archive.name + '\n', encoding='ascii')

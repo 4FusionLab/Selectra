@@ -83,3 +83,17 @@ Fusion уже имеет Selection Sets и в отдельных рабочих 
 **Следующие этапы:** тело внутри component occurrence с сохранением области одного выбранного тела, положительные/отрицательные примеры, топологические регионы, надёжное различение отверстий/валов/скруглений, свободные поверхности, сохранённые пользовательские предпочтения. Интеграция внутрь чужой команды — отдельное исследование.
 
 **Обязательная CAD-приёмка:** настоящее меню ПКМ; одна/несколько исходных сущностей; разные типы геометрии; отсутствие результата; перестановка порядка примеров; повторный запуск; Cancel; прерывание другой командой; смена документа до idle; удалённая/невалидная сущность; сохранение выборки после закрытия Selectra и применение штатной операции. Подтвердить отсутствие изменений тел и таймлайна, измерить задержки. Проверки stubs, локальные unit-тесты и сборка ZIP этого не заменяют.
+
+## 7. Уточнения по результатам нативной разработки
+
+Актуальный сценарий — [UX.md](UX.md). Отдельное поле Preview убрано. Examples/Exclude используют SelectionCommandInput; результирующий набор показывается через CustomGraphics и превращается в обычное выделение только после OK. Команда захватывает примеры в `commandStarting`, до переключения штатного Select. [Событие](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/core_UserInterface_commandStarting.htm).
+
+Колесо возвращено штатной навигации Fusion. `Command.keyDown` и `KeyCodes.PageUpKeyCode/PageDownKeyCode` управляют общим ранжированным диапазоном. Это не графовое соседство. [keyDown](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/core_Command_keyDown.htm).
+
+Графика строится в `executePreview`. Дополнительный `doExecutePreview` поверх автоматического preview при изменении CommandInputs убран: он давал два обновления на одно действие. Валидные графические объекты переиспользуются через isVisible; удаление одной cached BRep-графики ранее приводило к недействительным соседним wrappers. На OK/Cancel удаляется вся временная группа.
+
+Magenta-наложение использует `CustomGraphicsShowThroughColorEffect` и depthPriority. Это предотвращает конкуренцию совпадающей временной поверхности с исходной без смещения CAD-геометрии; скрытые совпадения показываются полупрозрачно. В установленном SDK эффект назначается свойству `color`, как остальные CustomGraphicsColorEffect; описание фабрики в документации упоминает showThrough, которого нет в проверенных Python definitions. [Фабрика эффекта](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/fusion_CustomGraphicsShowThroughColorEffect_create.htm).
+
+Для нативных событий дополнение запускается как зарегистрированный add-in через Scripts API. Временный импорт entry point из MCP не заменяет этот жизненный цикл. [Scripts.addExisting](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/core_Scripts_addExisting.htm).
+
+При завершении набор фиксируется в execute, графика удаляется в destroy, затем короткий Timer только вызывает `fireCustomEvent`; обращения к модели остаются на основном потоке. В проверенном Fusion 2706.1.14 fireCustomEvent возвращал false, хотя callback выполнялся. Фактический успех подтверждается readback `activeSelections`, а не этим возвращаемым значением.

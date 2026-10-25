@@ -18,6 +18,7 @@ class PackagingTests(unittest.TestCase):
                 self.assertIn('Selectra/Selectra.py', names)
                 self.assertIn('Selectra/Selectra.manifest', names)
                 self.assertIn('LICENSE', names)
+                self.assertEqual(zipped.read('selectra.png'), (ROOT / 'selectra.png').read_bytes())
                 self.assertIn('docs/INSTALLATION.md', names)
                 self.assertIn('tests/test_matching.py', names)
                 self.assertEqual(names, sorted(names))
@@ -38,6 +39,7 @@ class PackagingTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             for name in ('Selectra/credentials.json', 'Selectra/__pycache__/cached.pyc',
+                         'Selectra/.vscode/debug.py',
                          '.env', 'private.key', 'dist/previous.zip'):
                 path = root / name
                 path.parent.mkdir(parents=True, exist_ok=True)
