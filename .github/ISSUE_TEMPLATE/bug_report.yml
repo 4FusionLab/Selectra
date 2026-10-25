@@ -1,0 +1,41 @@
+name: Ошибка
+description: Проблема с выделением, интерфейсом или установкой
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "Для уязвимостей используйте закрытый канал из SECURITY.md. Прототип пока не прошёл CAD-приёмку."
+  - type: input
+    id: versions
+    attributes:
+      label: Версии и ОС
+      description: Полная версия Fusion, версия/commit Selectra и ОС
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Как воспроизвести
+      description: Геометрия, примеры и последовательность действий; все примеры должны быть из одного тела
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Ожидаемый результат
+      description: Какие рёбра/грани должны быть выделены?
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Фактический результат
+      description: Какие элементы лишние или пропущены? Сохраняется ли выбор после закрытия команды?
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Пример и подтверждения
+      description: Минимальная модель, скриншоты и логи без личных данных. Только файлы, которые разрешено публиковать.

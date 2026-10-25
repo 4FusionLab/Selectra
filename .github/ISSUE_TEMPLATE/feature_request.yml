@@ -1,0 +1,31 @@
+name: Сценарий выделения
+description: Предложить задачу, которую Selectra должна решать
+title: "[Selection]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: task
+    attributes:
+      label: Что нужно выделить и зачем
+      description: Опишите задачу, например все скругления одного радиуса
+    validations:
+      required: true
+  - type: textarea
+    id: example
+    attributes:
+      label: Какой пример вы бы выбрали
+      description: Ребро, грань или группа; результаты должны находиться внутри тела примера
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: Что считать похожим и что исключить
+      description: Желаемые результаты и ложнопохожие элементы. Как второй пример мог бы уточнить намерение?
+    validations:
+      required: true
+  - type: textarea
+    id: model
+    attributes:
+      label: Модель или иллюстрация
+      description: Только материалы, которые разрешено публиковать
