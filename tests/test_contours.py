@@ -66,6 +66,27 @@ class ContourTests(unittest.TestCase):
         b = polygon(((0, 0), (4, 0), (5, 3), (1, 3)))
         self.assertFalse(contours_match((a,), (b,)))
 
+    def test_curved_boundary_with_different_tessellation_counts(self):
+        def ellipse(count, phase=0):
+            return polygon(tuple((3*math.cos(phase+2*math.pi*i/count), math.sin(phase+2*math.pi*i/count))
+                                 for i in range(count)))
+        a, b = (ellipse(120),), transform((ellipse(137, .013),), reflect=True)
+        result = compare_contours(a, b)
+        self.assertTrue(result.complete)
+        self.assertTrue(result.matched)
+
+    def test_different_curve_tessellations_keep_one_transform_for_holes(self):
+        def ellipse(count, rx, ry, x=0, phase=0):
+            return polygon(tuple((x+rx*math.cos(phase+2*math.pi*i/count), ry*math.sin(phase+2*math.pi*i/count))
+                                 for i in range(count)))
+        a = (ellipse(100, 3, 2), ellipse(24, .3, .2, x=.6))
+        b = (ellipse(113, 3, 2, phase=.01), ellipse(29, .3, .2, x=.6, phase=.02))
+        self.assertTrue(contours_match(a, transform(b, reflect=True)))
+        shifted = (b[0], ellipse(29, .3, .2, x=1.1, phase=.02))
+        result = compare_contours(a, transform(shifted, reflect=True))
+        self.assertTrue(result.complete)
+        self.assertFalse(result.matched)
+
     def test_scale_is_preserved(self):
         loops = (rectangle(),)
         doubled = tuple(tuple(tuple(2*x for x in p) for p in loop) for loop in loops)

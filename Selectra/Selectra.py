@@ -191,7 +191,8 @@ class Session:
             self.preview_error = ''
             noun = 'edges' if self.snapshot.entities[0].kind == 'edge' else 'faces'
             status = '{} of {} {} · {}'.format(len(keys), len(self.snapshot.entities), noun, dict(SCOPES)[self.scope_mode])
-            labels = {'shape': 'Same trimmed shape and size', 'direct_wall': 'Opposite side of the example wall',
+            labels = {'shape': 'Same trimmed shape and size',
+                      'shape_families': 'Matching shapes and sizes of the examples', 'direct_wall': 'Opposite side of the example wall',
                       'analog_wall': 'Opposite side of a shape analog', 'wall_sides': 'Matching wall pairs',
                       'repeated_region': 'Repeated group with matching shape and arrangement',
                       'parallel_planes': 'Parallel planes', 'same_area': 'Same area; shape may differ',

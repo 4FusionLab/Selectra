@@ -91,6 +91,7 @@ def geometric_order(snapshot, examples, exclusions, tolerance, scalar_items):
                             break
 
     repeated = set()
+    connected = len(seeds) == 1
     if 1 < len(seeds) <= 12:
         # A connected set of explicit examples can describe a repeated node.
         # Nonconnected examples remain independent feedback, not a new motif.
@@ -100,7 +101,8 @@ def geometric_order(snapshot, examples, exclusions, tolerance, scalar_items):
                 if key in seed_keys and key not in reachable:
                     reachable.add(key)
                     todo.append(key)
-        if reachable == seed_keys:
+        connected = reachable == seed_keys
+        if connected:
             search = similar_regions(snapshot, examples, compare_geometry=True, tolerance=tolerance)
             if not search.complete:
                 raise ValueError('Repeated-region analysis is incomplete. Use fewer examples.')
@@ -121,6 +123,12 @@ def geometric_order(snapshot, examples, exclusions, tolerance, scalar_items):
         hypotheses.append(('wall_sides', wall_family))
     if seed_keys <= repeated and repeated - seed_keys:
         hypotheses.append(('repeated_region', repeated))
+    if len(seeds) > 1 and not connected:
+        # Independent examples teach a union of verified shape families.
+        # Differing sizes must not erase shape and select every parallel wall.
+        families = set.union(*(shape_sets[s.key] for s in seeds))
+        if not negatives & families and families - seed_keys:
+            hypotheses.append(('shape_families', families))
     # Explicit feedback may favour a broad invariant over congruent shape.
     # Every accepted set must explain ALL seeds and separate ALL negatives.
     for field, label in (('normal', 'parallel_planes'), ('measure', 'same_area')):
@@ -143,9 +151,10 @@ def geometric_order(snapshot, examples, exclusions, tolerance, scalar_items):
             used.update(keys)
 
     add(preferred, hypothesis)
-    if hypothesis == 'shape':
+    if hypothesis in ('shape', 'shape_families'):
+        analogs = preferred - seed_keys - negatives
         add({k for s in examples for k in neighbours[s]}, 'direct_wall')
-        add({k for s in shapes - seed_keys - negatives for k in neighbours[s]}, 'analog_wall')
+        add({k for s in analogs for k in neighbours[s]}, 'analog_wall')
     # Coarse, fixed geometric-distance bands avoid a separate PgUp for every
     # tiny floating-point variation. Equal evidence always shares a group.
     for ceiling in (.02, .10, .25, .50, 1.0):

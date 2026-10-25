@@ -41,6 +41,16 @@ class IntentTests(unittest.TestCase):
         self.assertNotEqual(session.ranking.hypothesis, 'repeated_region')
         self.assertNotIn('d', session.result)
 
+    def test_disconnected_different_shapes_do_not_collapse_to_all_parallel_faces(self):
+        a, b = face('a', 4, 3), face('b', 2, 1, 10)
+        c, d = face('c', 4, 3, 20), face('d', 2, 1, 30)
+        distractor = face('large-wall', 20, 10, 40)
+        snap = BodySnapshot('A', 'r1', (a, b, c, d, distractor))
+        session = SelectionSession(snap, ('a', 'b'))
+        self.assertEqual(session.result, ('a', 'b', 'c', 'd'))
+        self.assertEqual(session.ranking.hypothesis, 'shape_families')
+        self.assertEqual(session.ranking, SelectionSession(snap, ('b', 'a')).ranking)
+
     def test_unknown_planar_seed_preserves_examples_with_warning(self):
         a = replace(face('a', 4, 3), contours=())
         session = SelectionSession(BodySnapshot('A', 'r1', (a, face('b', 4, 3))), ('a',))

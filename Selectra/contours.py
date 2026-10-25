@@ -5,13 +5,14 @@ The outer loop is first. All holes share its rigid transform; holes cannot
 slide independently. Reflection and either loop winding are allowed. Points
 are cm. Collinear subdivisions are removed, including STEP edge splits.
 
-This checks polygonal boundaries, not the underlying analytic curves. Different
-non-collinear tessellations may conservatively fail; callers must not describe
-that failure as proof of a different analytic surface. Missing/nonplanar data
+This checks complete polygonal boundaries, not underlying analytic curves.
+Different tessellations are aligned by boundary moments and verified in both
+directions within geometric tolerance. Alignment can conservatively fail;
+that failure is not proof of a different analytic surface. Missing/nonplanar data
 and exhausted work budgets have ``complete=False`` and never match.
 """
 from dataclasses import dataclass
-from math import hypot, isfinite
+from math import hypot, isfinite, atan2, cos, sin
 
 from .matching import Tolerance
 
@@ -237,6 +238,93 @@ def _holes_match(source, target, epsilon, work):
     return all(augment(i, set()) for i in range(len(source)))
 
 
+def _boundary_frame(loop):
+    # Exact line-integral moments: independent of collinear subdivisions and
+    # stable for different bounded tessellations of the same curved trim.
+    segments = [(a, b, hypot(b[0]-a[0], b[1]-a[1]))
+                for a, b in zip(loop, loop[1:]+loop[:1])]
+    total = sum(length for _, _, length in segments)
+    center = tuple(sum((a[i]+b[i])*.5*length for a, b, length in segments)/total for i in (0, 1))
+    xx = yy = xy = 0.0
+    for a, b, length in segments:
+        ax, ay = a[0]-center[0], a[1]-center[1]
+        bx, by = b[0]-center[0], b[1]-center[1]
+        xx += length*(ax*ax+ax*bx+bx*bx)/3
+        yy += length*(ay*ay+ay*by+by*by)/3
+        xy += length*(2*ax*ay+ax*by+bx*ay+2*bx*by)/6
+    return center, .5*atan2(2*xy, xx-yy)
+
+
+def _segment_distance(point, a, b):
+    dx, dy = b[0]-a[0], b[1]-a[1]
+    size = dx*dx+dy*dy
+    u = min(1.0, max(0.0, ((point[0]-a[0])*dx+(point[1]-a[1])*dy)/size)) if size else 0
+    return hypot(point[0]-a[0]-u*dx, point[1]-a[1]-u*dy)
+
+
+def _boundary_within(source, target, epsilon, work):
+    segments = tuple(zip(target, target[1:]+target[:1]))
+
+    def covered(a, b, depth=0):
+        da = db = float('inf')
+        for p, q in segments:
+            work.step()
+            d0, d1 = _segment_distance(a, p, q), _segment_distance(b, p, q)
+            # A segment capsule is convex: if both ends are inside the same
+            # target segment's capsule, the entire source segment is inside.
+            if max(d0, d1) <= epsilon:
+                return True
+            da, db = min(da, d0), min(db, d1)
+        if max(da, db) > epsilon:
+            return False
+        length = hypot(b[0]-a[0], b[1]-a[1])
+        # Distance to a closed boundary is 1-Lipschitz.
+        if max(da, db)+length/2 <= epsilon:
+            return True
+        if depth >= 12:
+            raise _BudgetExceeded
+        middle = ((a[0]+b[0])/2, (a[1]+b[1])/2)
+        return covered(a, middle, depth+1) and covered(middle, b, depth+1)
+
+    return all(covered(a, b) for a, b in zip(source, source[1:]+source[:1]))
+
+
+def _tessellation_match(source, target, epsilon, work):
+    if len(source) != len(target):
+        return False
+    ca, angle_a = _boundary_frame(source[0])
+    cb, angle_b = _boundary_frame(target[0])
+    for mirror in (1, -1):
+        for reverse in (0, 3.141592653589793):
+            angle = angle_b-mirror*angle_a+reverse
+            c, s = cos(angle), sin(angle)
+            def transform(loop):
+                return tuple((cb[0]+c*(x-ca[0])-s*mirror*(y-ca[1]),
+                              cb[1]+s*(x-ca[0])+c*mirror*(y-ca[1])) for x, y in loop)
+            moved = tuple(transform(loop) for loop in source)
+            if not (_boundary_within(moved[0], target[0], epsilon, work)
+                    and _boundary_within(target[0], moved[0], epsilon, work)):
+                continue
+            # Holes share the same transform; match their complete boundaries
+            # bijectively, never align each hole independently.
+            options = [[j for j, b in enumerate(target[1:])
+                        if _boundary_within(a, b, epsilon, work) and _boundary_within(b, a, epsilon, work)]
+                       for a in moved[1:]]
+            assigned = {}
+            def augment(i, seen):
+                for j in options[i]:
+                    work.step()
+                    if j not in seen:
+                        seen.add(j)
+                        if j not in assigned or augment(assigned[j], seen):
+                            assigned[j] = i
+                            return True
+                return False
+            if all(augment(i, set()) for i in range(len(options))):
+                return True
+    return False
+
+
 def compare_contours(a, b, tolerance=None, *, max_states=200000, max_points=512):
     """Compare complete planar polygonal trims under one rigid isometry.
 
@@ -265,10 +353,11 @@ def compare_contours(a, b, tolerance=None, *, max_states=200000, max_points=512)
         target, _ = _frame(b, epsilon, work)
         _validate_planar_loops(source, extent, work)
         _validate_planar_loops(target, extent, work)
-        if len(source) != len(target) or len(source[0]) != len(target[0]):
+        if len(source) != len(target):
             return ContourComparison(False, True, work.states)
-        if sorted(map(len, source[1:])) != sorted(map(len, target[1:])):
-            return ContourComparison(False, True, work.states)
+        if tuple(map(len, source)) != tuple(map(len, target)):
+            matched = _tessellation_match(source, target, epsilon, work)
+            return ContourComparison(matched, True, work.states)
         span = source[0][far][0]
         count = len(target[0])
         for shift in range(count):
@@ -298,7 +387,8 @@ def compare_contours(a, b, tolerance=None, *, max_states=200000, max_points=512)
                         holes = tuple(transform(loop) for loop in source[1:])
                         if _holes_match(holes, target[1:], epsilon, work):
                             return ContourComparison(True, True, work.states)
-        return ContourComparison(False, True, work.states)
+        matched = _tessellation_match(source, target, epsilon, work)
+        return ContourComparison(matched, True, work.states)
     except (_BudgetExceeded, ValueError, TypeError, OverflowError):
         return ContourComparison(False, False, work.states)
 
