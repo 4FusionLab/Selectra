@@ -15,6 +15,7 @@ from .highlight import HighlightRenderer, ScopeHighlightRenderer
 from .search_scope import SCOPES
 
 COMMAND_ID = 'DiegoV_Selectra_SelectSimilar'
+CHAIN_COMMAND_ID = 'DiegoV_Selectra_SelectChain'
 EVENT_ID = 'DiegoV_Selectra_ApplySelection'
 _bindings = []
 _sessions = []
@@ -44,7 +45,8 @@ def _active_entities(ui):
 
 
 class Session:
-    def __init__(self, command, preselected=None):
+    def __init__(self, command, preselected=None, chain=False):
+        self.chain = chain
         self.app = adsk.core.Application.get()
         self.document = self.app.activeDocument
         self.original = tuple(preselected) if preselected is not None else _active_entities(self.app.userInterface)
@@ -52,16 +54,20 @@ class Session:
         self.accepted, self.accepted_keys = False, ()
         self.preview_error = ''
         self.updating = False
-        self.scope_mode = 'component'
+        self.scope_mode = 'body' if chain else 'component'
         self.scope_notice = ''
-        self.snapshot, examples, self.refs, self.skipped, self.source_body, self.scope_guards = adapter.read_search_scope(self.original, self.scope_mode)
+        if chain:
+            from .chains import ChainSelection
+            self.snapshot, examples, self.refs, self.skipped, self.source_body, self.scope_guards, chains = adapter.read_chains(self.original)
+        else:
+            self.snapshot, examples, self.refs, self.skipped, self.source_body, self.scope_guards = adapter.read_search_scope(self.original, self.scope_mode)
         self.original = tuple(self.refs[key] for key in examples)
         self.original_guards = tuple((body, stamp) for body, stamp in self.scope_guards
                                      if any(e.body == body for e in self.original))
         from time import monotonic
-        self.timings = dict(adapter.read_search_scope.last_timings)
+        self.timings = {} if chain else dict(adapter.read_search_scope.last_timings)
         analysis_started = monotonic()
-        self.controller = SelectionSession(self.snapshot, examples)
+        self.controller = ChainSelection(self.snapshot, chains, examples) if chain else SelectionSession(self.snapshot, examples)
         self.timings['initial_analysis_seconds'] = monotonic() - analysis_started
         self.renderer = self.make_renderer()
         command.isRepeatable = False
@@ -78,18 +84,23 @@ class Session:
         selection_filter = 'Edges' if self.snapshot.entities[0].kind == 'edge' else 'Faces'
         self.examples_input = inputs.addSelectionInput('selectra_examples', 'Examples', 'Add another example from this search scope')
         self.examples_input.addSelectionFilter(selection_filter)
-        self.examples_input.setSelectionLimits(1, 0)
+        self.examples_input.setSelectionLimits(1, 1 if chain else 0)
         self.exclusions_input = inputs.addSelectionInput('selectra_exclusions', 'Exclude', 'Show an item that should not be included')
         self.exclusions_input.addSelectionFilter(selection_filter)
         self.exclusions_input.setSelectionLimits(0, 0)
         self.range_input = inputs.addIntegerSliderCommandInput(
-            'selectra_range', 'Similarity', 0, max(1, len(self.controller.ranking.tiers)), False)
+            'selectra_range', 'Chain Range' if chain else 'Similarity', 0, max(1, len(self.controller.ranking.tiers)), False)
         self.range_input.setText('Closest', 'Broader')
+        if chain:
+            self.range_input.tooltip = 'Add the next whole closed contour with PgUp or =; remove it with PgDown or -.'
+            self.scope_input.isVisible = False
+            self.exclusions_input.isVisible = False
         self.range_input.tooltip = 'Include less similar items with PgUp; remove the least similar items with PgDown.'
         hint = inputs.addTextBoxCommandInput('selectra_hint', '', 'PgUp / =: more | PgDown / -: fewer', 1, True)
         hint.isFullWidth = True
         group = inputs.addGroupCommandInput('selectra_refine', 'Refine')
         group.isExpanded = False
+        group.isVisible = not chain
         children = group.children
         self.criterion_options = [('auto', 'Automatic'),
             ('measure', 'Length' if self.snapshot.entities[0].kind == 'edge' else 'Area')]
@@ -142,7 +153,7 @@ class Session:
         self.source_body, self.scope_guards, self.scope_mode = source, guards, mode
         self.controller, self.renderer = controller, self.make_renderer()
         self.scope_notice = ''
-        self.timings = dict(adapter.read_search_scope.last_timings)
+        self.timings = {} if chain else dict(adapter.read_search_scope.last_timings)
         self.updating = True
         try:
             self.exclusions_input.clearSelection()
@@ -190,6 +201,11 @@ class Session:
             self.renderer.show(self.refs, keys, self.controller.boundary_group)
             self.preview_error = ''
             noun = 'edges' if self.snapshot.entities[0].kind == 'edge' else 'faces'
+            if self.chain:
+                self.info.text = ('{} {} · This Body'.format(len(keys), noun)
+                                  + ('\nClosed contours: {} of {}'.format(self.controller.level, len(self.controller.ranking.tiers))
+                                     if self.controller.ranking.tiers else '\nNo closed chain found. Choose another example.'))
+                return
             status = '{} of {} {} · {}'.format(len(keys), len(self.snapshot.entities), noun, dict(SCOPES)[self.scope_mode])
             labels = {'shape': 'Same trimmed shape and size',
                       'shape_families': 'Matching shapes and sizes of the examples',
@@ -233,6 +249,8 @@ class Menu(adsk.core.MarkingMenuEventHandler):
             if entities and all(adapter.kind(e) for e in entities):
                 if len({adapter.kind(e) for e in entities}) == 1:
                     args.linearMarkingMenu.controls.addCommand(ui.commandDefinitions.itemById(COMMAND_ID))
+                    if len(entities) == 1:
+                        args.linearMarkingMenu.controls.addCommand(ui.commandDefinitions.itemById(CHAIN_COMMAND_ID))
                     _diagnostics.append({'event': 'menu_added'})
         except Exception:
             _log()
@@ -241,19 +259,23 @@ class Menu(adsk.core.MarkingMenuEventHandler):
 class Starting(adsk.core.ApplicationCommandEventHandler):
     def notify(self, args):
         global _launch_context
-        if args.commandId == COMMAND_ID:
+        if args.commandId in (COMMAND_ID, CHAIN_COMMAND_ID):
             app = adsk.core.Application.get()
             _launch_context = (app.activeDocument, _active_entities(app.userInterface))
 
 
 class Created(adsk.core.CommandCreatedEventHandler):
+    def __init__(self, chain=False):
+        super().__init__()
+        self.chain = chain
+
     def notify(self, args):
         global _launch_context
         _diagnostics.append({'event': 'created'})
         try:
             context, _launch_context = _launch_context, None
             selected = context[1] if context and context[0] == adsk.core.Application.get().activeDocument else None
-            session = Session(args.command, selected)
+            session = Session(args.command, selected, self.chain)
             _sessions.append(session)
             _diagnostics.append({'event': 'session_ready', 'examples': session.controller.feedback.examples})
         except Exception as error:
@@ -303,7 +325,7 @@ class Changed(adsk.core.InputChangedEventHandler):
                 s.controller.set_criterion(s.criterion_options[s.criterion_input.selectedItem.index][0])
             elif key == 'selectra_examples':
                 keys = s.input_keys(s.examples_input)
-                snapshot = adapter.enrich_curved(s.snapshot, s.refs, keys)
+                snapshot = s.snapshot if s.chain else adapter.enrich_curved(s.snapshot, s.refs, keys)
                 previous = s.controller.snapshot
                 s.controller.snapshot = snapshot
                 try:
@@ -401,7 +423,7 @@ class Validated(adsk.core.ValidateInputsEventHandler):
     def notify(self, args):
         s = self.session
         try:
-            args.areInputsValid = (bool(s.controller.feedback.examples) and not s.preview_error
+            args.areInputsValid = (bool(s.controller.feedback.examples) and getattr(s.controller, 'can_apply', True) and not s.preview_error
                                    and adapter.scope_current(s.scope_guards)
                                    and s.input_keys(s.examples_input) == s.controller.feedback.examples
                                    and s.input_keys(s.exclusions_input) == s.controller.feedback.exclusions
@@ -419,6 +441,8 @@ class Executed(adsk.core.CommandEventHandler):
         s = self.session
         if not adapter.scope_current(s.scope_guards):
             raise RuntimeError('Body changed before confirming the selection.')
+        if not getattr(s.controller, 'can_apply', True):
+            raise RuntimeError('Choose a closed chain before confirming.')
         if s.renderer.keys != s.chosen_keys():
             s.draw_preview()
         s.accepted_keys = tuple(s.chosen_keys())
@@ -504,6 +528,9 @@ def run(context):
         definition = ui.commandDefinitions.addButtonDefinition(
             COMMAND_ID, 'Select Similar', 'Find similar edges or faces from your selection.')
         _bind(definition.commandCreated, Created(), _bindings)
+        chain_definition = ui.commandDefinitions.addButtonDefinition(
+            CHAIN_COMMAND_ID, 'Select Chain', 'Find the nearest closed edge loop or closed chain of wall faces.')
+        _bind(chain_definition.commandCreated, Created(True), _bindings)
         _bind(ui.commandStarting, Starting(), _bindings)
         _bind(ui.markingMenuDisplaying, Menu(), _bindings)
         event = app.registerCustomEvent(EVENT_ID)
@@ -534,6 +561,7 @@ def stop(context):
     if _event_registered:
         app.unregisterCustomEvent(EVENT_ID)
         _event_registered = False
-    definition = app.userInterface.commandDefinitions.itemById(COMMAND_ID)
-    if definition:
-        definition.deleteMe()
+    for command_id in (COMMAND_ID, CHAIN_COMMAND_ID):
+        definition = app.userInterface.commandDefinitions.itemById(command_id)
+        if definition:
+            definition.deleteMe()

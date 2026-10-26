@@ -468,3 +468,40 @@ def enrich_curved(snapshot, references, examples):
             d, changed = replace(d, patch=patch), True
         entities.append(d)
     return replace(snapshot, entities=tuple(entities)) if changed else snapshot
+
+
+def read_chains(entities):
+    """Closed edge loops or adjacent wall rings, strictly in the source body."""
+    from .chains import ClosedChain
+    if len(entities) != 1:
+        raise ValueError('Select one edge or one wall face for Select Chain.')
+    snapshot, examples, refs, skipped, source = read_snapshot(entities, include_relations=False)
+    started, chains, count = monotonic(), [], 0
+    stamp = body_stamp(source)
+    for cap in source.faces:
+        for loop in cap.loops:
+            count += 1
+            if count > 10000 or monotonic()-started > READ_BUDGET_SECONDS:
+                raise ValueError('Closed-chain analysis exceeded its budget. No partial chain was applied.')
+            edges = tuple(c.edge for c in loop.coEdges)
+            if not edges:
+                continue
+            perimeter = sum(edge.length for edge in edges)
+            if kind(entities[0]) == 'edge':
+                keys = tuple(str(edge.tempId) for edge in edges)
+                if len(set(keys)) == len(keys) and all(key in refs for key in keys):
+                    chains.append(ClosedChain(keys, perimeter, not loop.isOuter))
+            else:
+                walls = []
+                for edge in edges:
+                    others = tuple(face for face in edge.faces if face != cap)
+                    if len(others) != 1:
+                        break
+                    walls.append(str(others[0].tempId))
+                else:
+                    if (all(key in refs for key in walls) and
+                            all(a == b or b in snapshot.adjacency[a] for a,b in zip(walls,walls[1:]+walls[:1]))):
+                        chains.append(ClosedChain(tuple(walls), perimeter, not loop.isOuter))
+    if not source.isValid or body_stamp(source) != stamp:
+        raise ValueError('Geometry changed while reading closed chains.')
+    return snapshot, examples, refs, skipped, source, ((source, stamp),), tuple(chains)
