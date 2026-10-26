@@ -485,9 +485,8 @@ def chain_planes(cap):
 
 
 def smooth_patch_chains(body, key_map):
-    """Add whole boundaries of tangential face patches, never open walks."""
-    from collections import Counter
-    from .patch_boundaries import closed_boundary_loops
+    """Read full and intermediate tangential patch boundaries from exact topology."""
+    from .patch_boundaries import closed_boundary_loops, connected_patches
     from .plane_order import classify_planes
     from .matching import Tolerance
     from .chains import ClosedChain
@@ -511,43 +510,62 @@ def smooth_patch_chains(body, key_map):
             continue
         face_edges=[]
         edge_refs={}
-        counts=Counter()
         for face in region.values():
             keys=[]
             for loop in face.loops:
                 for coedge in loop.coEdges:
                     edge=coedge.edge;key=str(edge.tempId)
-                    keys.append(key);edge_refs[key]=edge;counts[key]+=1
+                    keys.append(key);edge_refs[key]=edge
             face_edges.append(tuple(keys))
         topology={}
-        for key,count in counts.items():
-            if count!=1:
-                continue
-            edge=edge_refs[key]
+        for key,edge in edge_refs.items():
             if edge.isDegenerate:
-                break
+                continue
             a,b=edge.startVertex,edge.endVertex
             if a is None or b is None:
                 if not adsk.core.Circle3D.cast(edge.geometry):
-                    break
+                    continue
                 topology[key]=('circle:'+key,'circle:'+key)
             else:
                 topology[key]=(a.tempId,b.tempId)
-        else:
-            for loop in closed_boundary_loops(face_edges,topology):
-                if any(not key_map.get(key) for key in loop):
-                    continue
-                keys=tuple(sorted({part for key in loop for part in key_map[key]}))
-                planes=None
-                for key in loop:
+        def patch_loops(faces):
+            from collections import Counter
+            counts=Counter(key for edges in faces for key in edges)
+            if any(count==1 and key not in topology for key,count in counts.items()):
+                return ()
+            return closed_boundary_loops(faces,topology)
+        candidates=[(loop,False) for loop in patch_loops(face_edges)]
+        for patch in connected_patches(face_edges):
+            if monotonic()-started>READ_BUDGET_SECONDS:
+                raise ValueError('Connected-contour analysis exceeded its budget. No partial contour was applied.')
+            candidates.extend((loop,True) for loop in patch_loops(tuple(face_edges[i] for i in patch)))
+        unique={}
+        for loop,supplemental in candidates:
+            unique[loop]=unique.get(loop,True) and supplemental
+        support_cache={}
+        length_cache={}
+        for loop,supplemental in unique.items():
+            if monotonic()-started>READ_BUDGET_SECONDS:
+                raise ValueError('Connected-contour analysis exceeded its budget. No partial contour was applied.')
+            if any(not key_map.get(key) for key in loop):
+                continue
+            keys=tuple(sorted({part for key in loop for part in key_map[key]}))
+            planes=None
+            for key in loop:
+                if key not in support_cache:
                     support=[]
                     for face in edge_refs[key].faces:
                         view=face.createForAssemblyContext(body.assemblyContext) if body.assemblyContext else face
                         support.extend(chain_planes(view))
-                    planes=tuple(support) if planes is None else tuple(p for p in planes if classify_planes((p,),support,Tolerance())=='coplanar')
-                    if not planes:
-                        break
-                result.append(ClosedChain(keys,sum(edge_refs[key].length for key in loop),False,planes or ()))
+                    support_cache[key]=tuple(support)
+                support=support_cache[key]
+                planes=tuple(support) if planes is None else tuple(p for p in planes if classify_planes((p,),support,Tolerance())=='coplanar')
+                if not planes:
+                    break
+            for key in loop:
+                if key not in length_cache:
+                    length_cache[key]=edge_refs[key].length
+            result.append(ClosedChain(keys,sum(length_cache[key] for key in loop),False,planes or (),supplemental))
     return tuple(result)
 
 
@@ -615,7 +633,7 @@ def read_chains(entities, across_contact=True):
         snapshot, maps = merge_snapshots(snapshots, uuid4().hex, json.dumps([s.revision for s in snapshots]))
         refs = {maps[i][key]: entity for i, own in enumerate(refs_by_body) for key, entity in own.items()}
         examples = tuple(next(key for key,value in refs.items() if value == e) for e in entities)
-        chains = tuple(ClosedChain(tuple(maps[i][key] for key in chain.keys),chain.perimeter,chain.inner,chain.planes)
+        chains = tuple(ClosedChain(tuple(maps[i][key] for key in chain.keys),chain.perimeter,chain.inner,chain.planes,chain.supplemental)
                        for i, own in enumerate(chains_by_body) for chain in own)
         result = snapshot, examples, refs, skipped, bodies[0], tuple(guards), chains
     read_chains.last_contact_guards = result[5]

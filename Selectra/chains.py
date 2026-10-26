@@ -14,6 +14,7 @@ class ClosedChain:
     perimeter: float
     inner: bool = False
     planes: tuple = ()
+    supplemental: bool = False
 
     def __post_init__(self):
         object.__setattr__(self, 'keys', tuple(sorted(set(self.keys))))
@@ -54,7 +55,7 @@ class ChainSelection:
         candidates = {}
         for chain in eligible:
             relation = classes.index(classify_planes(chain.planes,reference,t)) if reference else 3
-            score = relation, not chain.inner, chain.perimeter
+            score = relation, chain.supplemental, not chain.inner, chain.perimeter
             if chain.keys not in candidates or score < candidates[chain.keys]:
                 candidates[chain.keys] = score
         ordered = sorted(candidates, key=lambda keys: (candidates[keys], keys))

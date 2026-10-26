@@ -42,3 +42,32 @@ def closed_boundary_loops(face_coedges, edge_vertices, *, max_edges=100000):
         if all(len(incidence[vertex])==2 for vertex in nodes):
             loops.append(tuple(sorted(component)))
     return tuple(sorted(loops))
+
+
+def connected_patches(face_coedges, *, max_states=100000):
+    """Proper connected multi-face subsets; full patches are handled first."""
+    owners=defaultdict(set)
+    for i,edges in enumerate(face_coedges):
+        for edge in edges:
+            owners[edge].add(i)
+    neighbors=[set() for _ in face_coedges]
+    for group in owners.values():
+        for i in group:
+            neighbors[i].update(group-{i})
+    seen={frozenset((i,)) for i in range(len(face_coedges))}
+    todo=list(sorted(seen,key=lambda p:tuple(p)))
+    result=[]
+    while todo:
+        patch=todo.pop()
+        frontier=set().union(*(neighbors[i] for i in patch))-patch
+        for i in sorted(frontier):
+            expanded=patch|{i}
+            if expanded in seen:
+                continue
+            seen.add(expanded)
+            if len(seen)>max_states:
+                raise ValueError('Connected-patch analysis exceeded its topology budget.')
+            if len(expanded)<len(face_coedges):
+                result.append(tuple(sorted(expanded)))
+                todo.append(expanded)
+    return tuple(sorted(result,key=lambda p:(len(p),p)))

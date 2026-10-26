@@ -30,3 +30,20 @@ class PatchBoundaryTests(unittest.TestCase):
     def test_missing_data_or_budget_cannot_create_partial_contours(self):
         with self.assertRaises(ValueError): closed_boundary_loops((('a',),),{})
         with self.assertRaises(ValueError): closed_boundary_loops((('a','b'),),{},max_edges=1)
+
+    def test_intermediate_patch_keeps_edge_hidden_inside_full_region(self):
+        from Selectra.patch_boundaries import connected_patches
+        faces=(('a','join1','b'),('join1','c','join2'),('join2','d','e'))
+        patches=connected_patches(faces)
+        self.assertIn((0,1),patches)
+        self.assertIn((1,2),patches)
+        self.assertNotIn((0,2),patches)
+        ends={'a':(0,1),'join1':(1,2),'b':(2,0),'c':(1,3),'join2':(3,2),'d':(3,4),'e':(4,2)}
+        boundary=closed_boundary_loops(tuple(faces[i] for i in (0,1)),ends)
+        self.assertEqual(boundary,(('a','b','c','join2'),))
+        self.assertNotIn('join2',closed_boundary_loops(faces,ends)[0])
+
+    def test_connected_patch_budget_is_explicit(self):
+        from Selectra.patch_boundaries import connected_patches
+        with self.assertRaises(ValueError):
+            connected_patches((('x',),('x','y'),('y',)),max_states=3)

@@ -127,3 +127,11 @@ class ChainTests(unittest.TestCase):
         a.adjust_similarity(1)
         self.assertEqual(a.result,tuple('ade'))
         self.assertEqual(len(a.ranking.tiers),2)
+
+    def test_intermediate_patches_preserve_existing_variants_within_plane_class(self):
+        old=ClosedChain(('a','b','c'),10)
+        extra=ClosedChain(('a','d','e'),1,supplemental=True)
+        s=ChainSelection(snapshot(),(extra,old),('a',))
+        self.assertEqual(s.ranking.tiers,(old.keys,extra.keys))
+        s.replace_examples(('a','e'))
+        self.assertEqual(s.result,extra.keys)
