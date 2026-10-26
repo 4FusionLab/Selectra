@@ -1,15 +1,15 @@
-## Что изменилось
+## What changed
 
-Опишите задачу и результирующее поведение. Для изменения выделения приведите пример до/после.
+Describe the task and resulting behavior. For selection changes, include a before/after example. English and Russian are both welcome.
 
-## Проверка
+## Validation
 
-- [ ] Тесты, compileall, check_project и сборка ZIP выполнены.
-- [ ] Поиск остаётся внутри тела примера.
-- [ ] Документация и Unreleased в CHANGELOG обновлены, если меняется поведение.
+- [ ] Tests, compileall, check_project, and ZIP build completed.
+- [ ] Search Scope and Chain across contact boundaries are preserved.
+- [ ] English and Russian user documentation and Unreleased in CHANGELOG are updated when behavior changes.
 
-Для Fusion API/UI укажите Fusion/ОС и сценарии из docs/VALIDATION.md. Невыполненные проверки обозначьте явно. CI проверяет Python; он не заменяет запуск в Fusion.
+For Fusion API or UI changes, list the Fusion version, operating system, and scenarios from docs/VALIDATION.md. State which checks were not performed. CI checks Python; it does not replace running Fusion.
 
-## Ограничения
+## Limitations
 
-Укажите известные ограничения и непроверенные сценарии, если они есть.
+List known limitations or untested scenarios, if any.

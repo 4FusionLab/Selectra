@@ -1,9 +1,11 @@
-# Правила общения
+# Code of conduct
 
-В проекте приветствуются участники с любым опытом CAD и программирования. Обсуждайте поведение программы, код и воспроизводимые факты; уважайте время и границы других участников.
+**English** · [Русский](CODE_OF_CONDUCT.ru.md)
 
-Приемлемы предметные разногласия, вопросы и исправление ошибок. Недопустимы оскорбления, травля, угрозы, дискриминация, нежелательные личные обращения и публикация чужих личных данных.
+Participants of all levels of CAD and programming experience are welcome. Discuss software behavior, code, and reproducible facts. Respect other participants' time and boundaries.
 
-Правила действуют в issues, pull requests и других публичных обсуждениях Selectra. Мейнтейнеры могут удалить нарушающий правила материал, ограничить обсуждение или доступ участника с учётом характера и повторяемости нарушения.
+Constructive disagreement, questions, and corrections are welcome. Insults, harassment, threats, discrimination, unwanted personal contact, and publishing another person's private information are not acceptable.
 
-О нарушении сообщите мейнтейнерам через контакты [4FusionLab](https://github.com/4FusionLab). Если закрытый контакт не указан, создайте issue с просьбой связаться приватно, без деталей нарушения и личных данных. В приватном сообщении приложите ссылку и достаточный контекст. Канал уязвимостей предназначен для проблем безопасности, а не конфликтов в сообществе.
+These rules apply to issues, pull requests, and other public Selectra discussions. Maintainers may remove content, limit a discussion, or restrict participation according to the nature and recurrence of a violation.
+
+Report a violation to the maintainers through the contacts listed on [4FusionLab](https://github.com/4FusionLab). If no private contact is available, open an issue requesting private contact without including incident details or personal information. In the private message, provide a link and enough context to assess the situation. The vulnerability channel is for security issues, not community disputes.

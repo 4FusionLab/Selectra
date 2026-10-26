@@ -3,8 +3,10 @@
   "type": "addin",
   "id": "98a76b49-14e7-45dc-b051-c2c397eff6c0",
   "author": "DiegoV",
-  "description": {"": "Selectra: find similar BRep edges and faces from examples. Development prototype."},
-  "version": "0.0.1",
+  "description": {
+    "": "Selectra: select similar BRep edges and faces, or follow closed contours in Autodesk Fusion."
+  },
+  "version": "1.0.0",
   "runOnStartup": false,
   "supportedOS": "windows|mac"
 }

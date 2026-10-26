@@ -1,0 +1,13 @@
+{
+  "description": "Select similar edges, matching faces, and closed contours in Autodesk Fusion. Select Similar and Select Chain by 4FusionLab.",
+  "topics": [
+    "autodesk-fusion",
+    "fusion360",
+    "fusion-360-addin",
+    "cad",
+    "brep",
+    "selection",
+    "python",
+    "4fusionlab"
+  ]
+}

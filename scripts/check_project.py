@@ -14,7 +14,7 @@ def check(root=ROOT):
     assert manifest['autodeskProduct'] == 'Fusion360'
     assert re.fullmatch(r'\d+\.\d+\.\d+', manifest['version'])
     UUID(manifest['id'])
-    assert manifest['runOnStartup'] is False, 'Prototype should not start automatically.'
+    assert manifest['runOnStartup'] is False, 'Startup must remain an explicit user choice.'
     required = ('README.md', 'LICENSE', 'CONTRIBUTING.md', 'CODE_OF_CONDUCT.md',
                 'SECURITY.md', 'CHANGELOG.md', 'AGENTS.md', 'PLAN.md',
                 'docs/INSTALLATION.md', 'docs/PUBLISHING.md', 'docs/VALIDATION.md',

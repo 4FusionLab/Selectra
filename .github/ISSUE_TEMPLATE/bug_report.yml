@@ -1,41 +1,41 @@
-name: Ошибка
-description: Проблема с выделением, интерфейсом или установкой
+name: Bug report
+description: A problem with selection, the interface, or installation
 title: "[Bug]: "
 labels: [bug]
 body:
   - type: markdown
     attributes:
-      value: "Для уязвимостей используйте закрытый канал из SECURITY.md. Прототип пока не прошёл CAD-приёмку."
+      value: "Reports in English or Russian are welcome. Include the command, examples, and result so we can reproduce the problem. For vulnerabilities, use the private channel in SECURITY.md."
   - type: input
     id: versions
     attributes:
-      label: Версии и ОС
-      description: Полная версия Fusion, версия/commit Selectra и ОС
+      label: Versions and operating system
+      description: Full Fusion version, Selectra version or commit, and operating system
     validations:
       required: true
   - type: textarea
     id: reproduce
     attributes:
-      label: Как воспроизвести
-      description: Геометрия, примеры и последовательность действий; все примеры должны быть из одного тела
+      label: Steps to reproduce
+      description: Describe the command, selected examples, search scope, and settings
     validations:
       required: true
   - type: textarea
     id: expected
     attributes:
-      label: Ожидаемый результат
-      description: Какие рёбра/грани должны быть выделены?
+      label: Expected result
+      description: Which edges or faces should be selected?
     validations:
       required: true
   - type: textarea
     id: actual
     attributes:
-      label: Фактический результат
-      description: Какие элементы лишние или пропущены? Сохраняется ли выбор после закрытия команды?
+      label: Actual result
+      description: Which elements are missing or unwanted? Is the selection preserved after confirming?
     validations:
       required: true
   - type: textarea
     id: evidence
     attributes:
-      label: Пример и подтверждения
-      description: Минимальная модель, скриншоты и логи без личных данных. Только файлы, которые разрешено публиковать.
+      label: Example and evidence
+      description: A minimal model, screenshots, and logs without personal information. Share only files you are allowed to publish.

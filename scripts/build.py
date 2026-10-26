@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""Build a deterministic prototype source ZIP using an explicit file allowlist."""
+"""Build a deterministic release ZIP using an explicit file allowlist."""
 import argparse
 import hashlib
 import json
@@ -14,7 +14,7 @@ def source_files(root):
     files = {root / name for name in ('.gitignore', '.gitattributes', '.editorconfig', 'LICENSE', 'selectra.png')}
     files.update(root.glob('*.md'))
     patterns = {'Selectra': ('*.py', '*.manifest'), 'scripts': ('*.py',),
-                'tests': ('*.py',), 'evaluation': ('*.py', '*.json'), 'docs': ('*.md',), '.github': ('*.yml', '*.md')}
+                'tests': ('*.py',), 'evaluation': ('*.py', '*.json'), 'docs': ('*.md', '*.png'), '.github': ('*.yml', '*.md')}
     for directory, globs in patterns.items():
         for pattern in globs:
             files.update((root / directory).rglob(pattern))
@@ -30,7 +30,7 @@ def build(root=ROOT, output=None):
         raise ValueError('Manifest version must be X.Y.Z.')
     output = Path(output) if output is not None else root / 'dist'
     output.mkdir(parents=True, exist_ok=True)
-    archive = output / ('Selectra-' + version + '-prototype.zip')
+    archive = output / ('Selectra-' + version + '.zip')
     files = source_files(root)
     for path in files:
         if path.is_symlink() or not path.resolve().is_relative_to(root):

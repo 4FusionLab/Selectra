@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Сообщить об уязвимости приватно
+  - name: Report a vulnerability privately
     url: https://github.com/4FusionLab/Selectra/security/advisories/new
-    about: Пожалуйста, не публикуйте детали уязвимостей в обычных issues.
+    about: Please do not publish vulnerability details in public issues.

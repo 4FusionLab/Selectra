@@ -1,83 +1,97 @@
-<p align="center"><img src="selectra.png" alt="Selectra — выбор по примерам" width="200"></p>
+<p align="center">
+  <img src="selectra.png" alt="Selectra — goddess of choice" width="200">
+</p>
 
-# Selectra for Autodesk Fusion
+<h1 align="center">Selectra for Autodesk Fusion</h1>
+<p align="center"><strong>Selectra — goddess of choice. Show an example. She’ll find the rest.</strong><br>Similar edges, matching faces, and closed contours — without picking every element by hand.</p>
 
-**Покажи пример — выдели похожее.** Дополнение [4FusionLab](https://github.com/4FusionLab) для выделения BRep-рёбер и граней по выбранным примерам.
+<p align="center">
+  <a href="https://github.com/4FusionLab/Selectra/actions/workflows/ci.yml"><img src="https://github.com/4FusionLab/Selectra/actions/workflows/ci.yml/badge.svg" alt="Build checks"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="GPL-3.0 license"></a>
+</p>
 
-[![CI](https://github.com/4FusionLab/Selectra/actions/workflows/ci.yml/badge.svg)](https://github.com/4FusionLab/Selectra/actions/workflows/ci.yml)
-[![Лицензия: GPL-3.0-only](https://img.shields.io/badge/license-GPL--3.0--only-blue.svg)](LICENSE)
-![Статус: прототип](https://img.shields.io/badge/status-prototype-orange.svg)
+<p align="center"><a href="https://github.com/4FusionLab/Selectra/releases"><strong>Download</strong></a> · <a href="README.ru.md">Русский</a> · <a href="https://github.com/4FusionLab/Selectra/issues/new/choose">Report a problem</a></p>
 
-## Как это должно работать
+## Pick the example. Keep the native selection.
 
-Выбрать ребро или грань → ПКМ → **Select Similar** → проверить Magenta-подсветку → **OK**.
+Choose an edge or face, open the context menu, and let Selectra build your selection. Check the magenta highlight, adjust the range, and confirm. The result becomes ordinary Fusion selection, ready for your next modeling operation.
 
-**Search Scope** задаёт область: **This Body**, **This Component** (по умолчанию), **All Components**. This Component включает выбранный экземпляр и его вложенные компоненты; All Components — всю видимую сборку. Скрытые и недоступные для выбора тела исключены. Дополнительные примеры и исключения берутся из выбранной области.
+**Selectra 1.0.0 brings two commands: Select Similar and Select Chain.** [Release notes →](docs/releases/1.0.0.md)
 
-Selectra предлагает критерий сама: длину, направление, площадь, радиус или сочетание признаков. Второй пример помогает уточнить намерение:
-
-- Рёбра разной длины, но одного направления → искать параллельные рёбра.
-- Рёбра одной длины, но разных направлений → искать по длине.
-- Цилиндрические грани одного радиуса с разной площадью → искать по радиусу.
-
-**PgUp / PgDown** и **= / -** расширяют и сужают набор по рангу похожести; ползунок Similarity делает то же самое. Все элементы выбранного типа текущей области ранжируются, равно похожие включаются вместе. Дополнительный пример в **Examples** или лишний элемент в **Exclude** уточняет смысл. Раздел **Refine** содержит необязательный выбор признака; перед каждым запуском он не требуется. Ранжирование работает локально, без сторонних сервисов и Python-зависимостей времени выполнения.
-
-## Состояние проекта
-
-**0.0.1 — экспериментальная разработка.** Ядро проверено локально, базовые сценарии рёбер и граней — в Fusion на macOS. Полная матрица CAD-приёмки и Windows Fusion ещё впереди; это не стабильный релиз.
-
-| Часть | Состояние |
+| Command | What you can do |
 | --- | --- |
-| Ранжирование, примеры и исключения | Реализованы; вложенные диапазоны, история и контроль одного тела покрыты тестами |
-| Планарные контуры и стенки | Полигональная форма, отверстия, локальный материал и порядок групп проверены на нативной фикстуре macOS |
-| Повторяющиеся планарные узлы | Связанные примеры задают общий граф и геометрию; базовый нативный сценарий проверен |
-| Чтение BRep | Тела корневого и вложенных компонентов; проверены раздельные экземпляры, вращения и мировая подсветка |
-| Нативный сценарий | ПКМ, Magenta-подсветка, PgUp/PgDown, OK/Cancel; точный объём проверки — в CAD-протоколе |
-| macOS / Windows | Целевые платформы; CI проверяет Python, а не приложение Fusion |
-| Связность, пути и похожие регионы | Есть офлайн-ядро; отдельные нативные инструменты ещё не подключены |
-| Component occurrences | Поддержаны; CAD-проверка на macOS, Windows остаётся в матрице |
-| Распознавание отверстий/скруглений | Запланировано |
+| **Select Similar** | Find edges, faces, and face groups that match your examples |
+| **Select Chain** | Follow a closed edge loop or a closed chain of wall faces |
 
-Одинаковый радиус цилиндра пока не отличает отверстие от наружного вала. Совпадение площади, периметра и числа рёбер не доказывает одинаковую форму. Встраивание в открытый диалог Fillet/Chamfer не реализовано.
+## Select Similar
 
-## Попробовать прототип
+Start with one edge or face. Add **Examples** to explain what belongs in the selection, or use **Exclude** to point out an unwanted match.
 
-Скачайте исходники через **Code → Download ZIP** или клонируйте репозиторий. Подключите внутреннюю папку `Selectra`, содержащую `Selectra.py` и `Selectra.manifest`, через **Utilities → Scripts and Add-Ins**.
+- Shape and size take priority over position.
+- Matches in the example planes come before parallel planes, then other planes.
+- Separate planar examples can describe different shape and size families.
+- Connected face examples can describe a repeating group, including curved groove walls.
 
-Точный порядок: [установка и удаление](docs/INSTALLATION.md). Начинайте с отдельного несохранённого документа и [протокола проверки](docs/VALIDATION.md). После подключения папка должна оставаться на месте: Fusion использует её напрямую.
+Choose where to search with **Search Scope**:
 
-Стабильного релиза пока нет. CI формирует ZIP прототипа с контрольной суммой как артефакт сборки; он не является доказательством CAD-приёмки.
+| Scope | Where it searches |
+| --- | --- |
+| **This Body** | The source body in the selected instance |
+| **This Component** | The selected component instance and its nested hierarchy; the default |
+| **All Components** | The entire visible assembly |
 
-## Разработка
+## Select Chain
 
-Ядро и инструменты репозитория используют стандартную библиотеку Python. CI запускается на Python 3.14 под Ubuntu, macOS и Windows; Fusion-модули `adsk` нужны только внутри приложения.
+Pick an edge to select its closed loop, or a wall face to follow the surrounding closed wall chain.
 
-```sh
-python -m unittest discover -s tests -v
-python -m compileall -q Selectra scripts tests
-python scripts/check_project.py
-python scripts/build.py
-```
+**Chain across contact** continues a contour through complete, exact body contact, such as parts created by **Split Body**. It is enabled by default. Gaps, partial contact, and overlapping volumes do not create a connection. The original bodies remain separate.
 
-Сборка создаёт `dist/Selectra-0.0.1-prototype.zip` и файл SHA-256. Она не устанавливает и не запускает дополнение.
+## Two starting points
 
-## Документация и участие
+| Your task | Start here |
+| --- | --- |
+| Find matching edges or faces | Pick examples → **Select Similar** → refine the highlighted set |
+| Follow a closed contour | Pick an edge or wall face → **Select Chain** → choose a contour |
 
-- [Продуктовый опыт](docs/UX.md) и [сценарии](docs/PRODUCT.md)
-- [Модель предсказания выбора](docs/INTENT_MODEL.md) и [термины](GLOSSARY.md)
-- [Ориентир Blender и границы CAD-адаптации](docs/BLENDER_PARITY.md)
-- [Fusion API: исследование и первичные источники](docs/API_RESEARCH.md)
-- [План разработки](PLAN.md)
-- [План итераций](docs/ITERATIONS.md), [оценка относительно baseline](docs/EVALUATION.md) и [исследование STEP-фрагментов](docs/SURFACE_GROUPS.md)
-- [Проверка в Fusion](docs/VALIDATION.md)
-- [Как участвовать](CONTRIBUTING.md), [история изменений](CHANGELOG.md) и [порядок публикации](docs/PUBLISHING.md)
-- [Сообщить о проблеме или предложить сценарий](https://github.com/4FusionLab/Selectra/issues/new/choose)
-- [Сообщения об уязвимостях](SECURITY.md) и [правила общения](CODE_OF_CONDUCT.md)
+**PgUp / =** adds the next level. **PgDown / -** removes the last included level. The slider controls the same range. Select Similar expands by similarity; Select Chain switches between complete contours through all examples. The mouse wheel stays available for Fusion navigation.
 
-Из [Perfora](https://github.com/4FusionLab/Perfora) перенесены архитектурные принципы: чистое ядро, нативный UI, отдельный слой CAD и проверка в настоящем Fusion. Selectra развивается в отдельном репозитории.
+**OK** applies the highlighted set. **Cancel** restores your original selection. Model geometry and the timeline stay unchanged.
 
-## Лицензия
+## See it in Fusion
 
-[GNU GPL v3.0 only](LICENSE), SPDX: `GPL-3.0-only`. Copyright © 2026 4FusionLab contributors.
+Select Similar finds the four matching full cylindrical walls. Select Chain follows the slot across the exact split between two bodies. Blue marks the original example; magenta shows the proposed result.
 
-Autodesk и Fusion — товарные знаки Autodesk, Inc. Selectra — независимый проект, не официальный продукт Autodesk.
+![Select Similar: matching hole walls](docs/images/select-similar.png)
+
+![Select Chain: a closed slot contour across two bodies](docs/images/select-chain-edges.png)
+
+[Wall-chain demo and release notes](docs/releases/1.0.0.md)
+
+## Install
+
+1. Download the add-in archive from [Releases](https://github.com/4FusionLab/Selectra/releases) and extract it to a permanent folder.
+2. In Fusion, open **Utilities → Scripts and Add-Ins**.
+3. Use **+ → Script or add-in from device** and select the `Selectra` folder containing `Selectra.py` and `Selectra.manifest`.
+4. Select **Selectra → Run**. Pick an edge or face and open the context menu.
+
+Fusion loads the add-in from that folder, so keep it in place. Selectra runs inside Autodesk Fusion on Windows and macOS; no separate Python installation or additional packages are needed.
+
+[Installation, updates, and removal →](docs/INSTALLATION.md)
+
+## Know the limits
+
+Selectra works with BRep edges and faces. Sketch entities, mesh bodies, and T-Spline geometry are outside these commands. Imported geometry is supported when it is represented as BRep bodies.
+
+Similarity depends on the available geometry. An identical radius alone does not identify an identical feature: an internal cylinder and an external shaft can share a radius. Check the preview before confirming, and use Examples or Exclude to refine the result.
+
+## Documentation and support
+
+[User guide](docs/GUIDE.md) · [FAQ](docs/FAQ.md) · [Release notes](docs/releases/1.0.0.md)
+
+[Report a problem](https://github.com/4FusionLab/Selectra/issues/new/choose) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Code of conduct](CODE_OF_CONDUCT.md)
+
+## A little workshop mythology
+
+Selectra is the goddess of choice, guardian of closed contours, and sworn enemy of picking the same faces by hand — from **4FusionLab's own mythology**, with a playful nod to ancient Greece. Her companion [Perfora](https://github.com/4FusionLab/Perfora), goddess of holes, takes care of the patterns.
+
+[GPL-3.0-only](LICENSE). An independent **4FusionLab** project, not affiliated with or endorsed by Autodesk. Autodesk and Fusion are trademarks of Autodesk, Inc.

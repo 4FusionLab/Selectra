@@ -1,13 +1,15 @@
-# Сообщения об уязвимостях
+# Reporting vulnerabilities
 
-## Поддерживаемые версии
+**English** · [Русский](SECURITY.ru.md)
 
-Selectra находится на стадии прототипа. Стабильных поддерживаемых релизов пока нет; исправления разрабатываются в `main`. Дополнение исполняет Python внутри Fusion с доступом, предоставленным приложению.
+## Release information
 
-## Как сообщить
+Include the version of Selectra you are using. Before submitting a report, check whether the issue also affects the latest available release. The add-in executes Python inside Fusion with the access granted by the application.
 
-Используйте [Report a vulnerability](https://github.com/4FusionLab/Selectra/security/advisories/new). Не публикуйте детали эксплуатации, токены и конфиденциальные модели в обычном issue.
+## How to report
 
-Укажите commit/версию, ОС, версию Fusion, шаги воспроизведения, последствия и минимальный пример. Приложите только данные, которыми разрешено делиться. Если закрытый канал недоступен, используйте контакты [4FusionLab](https://github.com/4FusionLab), сообщив сначала только о необходимости приватного обсуждения.
+Use [Report a vulnerability](https://github.com/4FusionLab/Selectra/security/advisories/new). Do not publish exploit details, tokens, or confidential models in a public issue.
 
-Ошибки геометрического сравнения и интерфейса обычно относятся к [bug report](https://github.com/4FusionLab/Selectra/issues/new/choose). При возможном несанкционированном доступе, выполнении кода или раскрытии данных используйте закрытый канал.
+Include the commit or version, operating system, Fusion version, reproduction steps, impact, and a minimal example. Share only information you are allowed to disclose. If the private channel is unavailable, use the contacts listed on [4FusionLab](https://github.com/4FusionLab) and initially state only that you need a private discussion.
+
+Geometry matching and interface problems normally belong in a [bug report](https://github.com/4FusionLab/Selectra/issues/new/choose). Use the private channel for possible unauthorized access, code execution, or data disclosure.

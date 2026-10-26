@@ -1,31 +1,34 @@
-name: Сценарий выделения
-description: Предложить задачу, которую Selectra должна решать
+name: Selection scenario
+description: Suggest a task for Selectra to support
 title: "[Selection]: "
 labels: [enhancement]
 body:
+  - type: markdown
+    attributes:
+      value: "Suggestions in English or Russian are welcome."
   - type: textarea
     id: task
     attributes:
-      label: Что нужно выделить и зачем
-      description: Опишите задачу, например все скругления одного радиуса
+      label: What do you want to select, and why?
+      description: Describe the task, such as selecting all fillets of one radius
     validations:
       required: true
   - type: textarea
     id: example
     attributes:
-      label: Какой пример вы бы выбрали
-      description: Ребро, грань или группа; результаты должны находиться внутри тела примера
+      label: Which example would you choose?
+      description: An edge, face, or group; specify the search scope and whether chains may cross bodies
     validations:
       required: true
   - type: textarea
     id: result
     attributes:
-      label: Что считать похожим и что исключить
-      description: Желаемые результаты и ложнопохожие элементы. Как второй пример мог бы уточнить намерение?
+      label: What should match, and what should be excluded?
+      description: Describe wanted results and similar-looking elements to exclude. How could another example refine the intent?
     validations:
       required: true
   - type: textarea
     id: model
     attributes:
-      label: Модель или иллюстрация
-      description: Только материалы, которые разрешено публиковать
+      label: Model or illustration
+      description: Share only material you are allowed to publish
