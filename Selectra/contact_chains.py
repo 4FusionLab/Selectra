@@ -158,12 +158,12 @@ def exact_contact(a, b, manager, work):
     return False
 
 
-def _edge_probe(edge):
+def _edge_probe(edge, *, include_vertices=True):
     evaluator = edge.evaluator
     ok, low, high = evaluator.getParameterExtents()
     if not ok:
         raise ValueError('Could not read an exact curve parameter interval.')
-    points = [v.geometry for v in (edge.startVertex, edge.endVertex) if v is not None]
+    points = [v.geometry for v in (edge.startVertex, edge.endVertex) if v is not None] if include_vertices else []
     for u in (.25, .5, .75):
         ok, point = evaluator.getPointAtParameter(low+(high-low)*u)
         if not ok:
@@ -209,7 +209,10 @@ def map_originals(refs, virtual, manager, work, edge):
         entity = source.edges.item(0) if edge else source.faces.item(0)
         sources[key] = source
         box = bounds(entity)
-        probe = _edge_probe(entity) if edge else (entity.pointOnFace,)
+        # Topological BRep vertices may be displaced from their own analytic
+        # curve within ASM's vertex tolerance. Compare actual curve samples;
+        # full wire difference below still proves containment of the trim.
+        probe = _edge_probe(entity, include_vertices=False) if edge else (entity.pointOnFace,)
         for target in targets:
             work.step()
             if not overlaps(box, target_boxes[str(target.tempId)]):
@@ -340,7 +343,7 @@ def read(entities, single_reader):
             if any(not mapped[key] for key in ids):
                 continue
             keys = tuple(sorted({key for item in ids for key in mapped[item]}))
-            chains.append(ClosedChain(keys, sum(e.length for e in edges), not loop.isOuter))
+            chains.append(ClosedChain(keys, sum(e.length for e in edges), not loop.isOuter, adapter.chain_planes(cap)))
     if not adapter.scope_current(all_guards):
         raise ValueError('The assembly changed while reading exact contacts.')
     return (snapshot, examples, refs, 0, candidates[0], tuple(guards), tuple(chains)), all_guards

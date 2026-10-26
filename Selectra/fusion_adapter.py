@@ -470,6 +470,20 @@ def enrich_curved(snapshot, references, examples):
     return replace(snapshot, entities=tuple(entities)) if changed else snapshot
 
 
+def chain_planes(cap):
+    """A planar supporting face proves the plane of its complete BRep loop."""
+    native=cap.nativeObject or cap
+    plane=adsk.core.Plane.cast(native.geometry)
+    if not plane:
+        return ()
+    normal, point=plane.normal, plane.origin
+    if cap.assemblyContext:
+        normal=normal.copy();point=point.copy()
+        normal.transformBy(cap.assemblyContext.transform2)
+        point.transformBy(cap.assemblyContext.transform2)
+    return ((_vector(normal),_vector(point)),)
+
+
 def _read_single_chains(entities):
     """Closed edge loops or adjacent wall rings, strictly in the source body."""
     from .chains import ClosedChain
@@ -490,7 +504,7 @@ def _read_single_chains(entities):
             if kind(entities[0]) == 'edge':
                 keys = tuple(str(edge.tempId) for edge in edges)
                 if len(set(keys)) == len(keys) and all(key in refs for key in keys):
-                    chains.append(ClosedChain(keys, perimeter, not loop.isOuter))
+                    chains.append(ClosedChain(keys, perimeter, not loop.isOuter, chain_planes(cap)))
             else:
                 walls = []
                 for edge in edges:
@@ -501,7 +515,7 @@ def _read_single_chains(entities):
                 else:
                     if (all(key in refs for key in walls) and
                             all(a == b or b in snapshot.adjacency[a] for a,b in zip(walls,walls[1:]+walls[:1]))):
-                        chains.append(ClosedChain(tuple(walls), perimeter, not loop.isOuter))
+                        chains.append(ClosedChain(tuple(walls), perimeter, not loop.isOuter, chain_planes(cap)))
     if not source.isValid or body_stamp(source) != stamp:
         raise ValueError('Geometry changed while reading closed chains.')
     return snapshot, examples, refs, skipped, source, ((source, stamp),), tuple(chains)
@@ -532,7 +546,7 @@ def read_chains(entities, across_contact=True):
         snapshot, maps = merge_snapshots(snapshots, uuid4().hex, json.dumps([s.revision for s in snapshots]))
         refs = {maps[i][key]: entity for i, own in enumerate(refs_by_body) for key, entity in own.items()}
         examples = tuple(next(key for key,value in refs.items() if value == e) for e in entities)
-        chains = tuple(ClosedChain(tuple(maps[i][key] for key in chain.keys),chain.perimeter,chain.inner)
+        chains = tuple(ClosedChain(tuple(maps[i][key] for key in chain.keys),chain.perimeter,chain.inner,chain.planes)
                        for i, own in enumerate(chains_by_body) for chain in own)
         result = snapshot, examples, refs, skipped, bodies[0], tuple(guards), chains
     read_chains.last_contact_guards = result[5]

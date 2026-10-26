@@ -217,7 +217,11 @@ class Session:
             return status+'\nNo closed contour passes through all examples.'
         if not self.controller.level:
             return status+'\nExamples only. PgUp / =: add a closed contour.'
-        return status+'\nClosed contours: {} of {}'.format(self.controller.level,len(self.controller.ranking.tiers))
+        status += '\nClosed contours: {} of {}'.format(self.controller.level,len(self.controller.ranking.tiers))
+        if self.controller.ranking.plane_groups:
+            labels={'coplanar':'In the example plane','parallel':'In parallel planes','other':'In other planes','unknown':'Contour plane unavailable'}
+            status += '\n'+labels[self.controller.ranking.plane_groups[self.controller.level-1]]
+        return status
 
     def preview(self):
         self.preview_error = ''

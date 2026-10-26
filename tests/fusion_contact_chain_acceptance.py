@@ -53,12 +53,13 @@ def prepare(entry):
     return {'exact_contact':True,'gaps_rejected':3,'partial_edge_overlap_rejected':True,'rotated':True}
 
 
-def open_command(kind):
+def open_command(kind, single=False):
     state=builtins._selectra_contact_test
     app=adsk.core.Application.get()
     assert app.activeDocument==state['document'] and app.userInterface.activeCommand=='SelectCommand'
     app.userInterface.activeSelections.clear()
-    for entity in state['edges'] if kind=='edge' else state['faces'][:1]:
+    examples = state['edges'][:1] if kind=='edge' and single else state['edges'] if kind=='edge' else state['faces'][:1]
+    for entity in examples:
         app.userInterface.activeSelections.add(entity)
     state['kind']=kind
     return app.userInterface.commandDefinitions.itemById(state['entry'].CHAIN_COMMAND_ID).execute()
@@ -74,6 +75,7 @@ def inspect(enabled=True):
     if enabled:
         assert len(result)==2 and all(entity in result for entity in expected),(len(result),session.chosen_keys())
         assert session.controller.can_apply
+        assert session.controller.ranking.plane_groups[0]=='coplanar'
     elif state['kind']=='edge':
         assert not session.controller.can_apply
         assert all(entity in result for entity in expected)

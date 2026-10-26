@@ -16,6 +16,10 @@ def support_planes(descriptor):
 def plane_class(descriptor, examples, tolerance):
     candidates = support_planes(descriptor)
     seeds = tuple(plane for example in examples for plane in support_planes(example))
+    return classify_planes(candidates, seeds, tolerance)
+
+
+def classify_planes(candidates, seeds, tolerance):
     if not candidates or not seeds:
         return 'unknown'
     parallel = False
