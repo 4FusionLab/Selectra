@@ -192,7 +192,8 @@ class Session:
             noun = 'edges' if self.snapshot.entities[0].kind == 'edge' else 'faces'
             status = '{} of {} {} · {}'.format(len(keys), len(self.snapshot.entities), noun, dict(SCOPES)[self.scope_mode])
             labels = {'shape': 'Same trimmed shape and size',
-                      'shape_families': 'Matching shapes and sizes of the examples', 'direct_wall': 'Opposite side of the example wall',
+                      'shape_families': 'Matching shapes and sizes of the examples',
+                      'curved_regions': 'Matching curved-face groups (sampled geometry)', 'direct_wall': 'Opposite side of the example wall',
                       'analog_wall': 'Opposite side of a shape analog', 'wall_sides': 'Matching wall pairs',
                       'repeated_region': 'Repeated group with matching shape and arrangement',
                       'parallel_planes': 'Parallel planes', 'same_area': 'Same area; shape may differ',
@@ -301,7 +302,16 @@ class Changed(adsk.core.InputChangedEventHandler):
             elif key == 'selectra_criterion':
                 s.controller.set_criterion(s.criterion_options[s.criterion_input.selectedItem.index][0])
             elif key == 'selectra_examples':
-                s.controller.replace_examples(s.input_keys(s.examples_input))
+                keys = s.input_keys(s.examples_input)
+                snapshot = adapter.enrich_curved(s.snapshot, s.refs, keys)
+                previous = s.controller.snapshot
+                s.controller.snapshot = snapshot
+                try:
+                    s.controller.replace_examples(keys)
+                except Exception:
+                    s.controller.snapshot = previous
+                    raise
+                s.snapshot = snapshot
             elif key == 'selectra_exclusions':
                 s.controller.replace_exclusions(s.input_keys(s.exclusions_input))
             elif key == 'selectra_reset':

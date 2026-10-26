@@ -141,7 +141,10 @@ def _rank_base(snapshot, examples, exclusions=(), tolerance=None, *, criterion='
     automatic_level = 1 if informative and distances and not identical_exclusion else 0
     if criterion == 'auto':
         from .intentions import geometric_order
-        order = geometric_order(snapshot, examples, exclusions, t, rows)
+        from .curved_regions import curved_order
+        order = curved_order(snapshot, examples, exclusions, t, rows)
+        if order is None:
+            order = geometric_order(snapshot, examples, exclusions, t, rows)
         if order is not None:
             group_distance = {key: index / max(1, len(order.groups))
                               for index, group in enumerate(order.groups) for key in group}
@@ -150,8 +153,8 @@ def _rank_base(snapshot, examples, exclusions=(), tolerance=None, *, criterion='
             rows.sort(key=lambda r: (r.distance, not r.example, r.key))
             return Ranking(tuple(rows), order.groups, tuple(field for field, _ in features),
                            order.ambiguous, tuple(i / max(1, len(order.groups)) for i in range(len(order.groups))),
-                           0 if order.ambiguous or not order.groups else 1,
-                           order.explanations, order.hypothesis)
+                           0 if order.ambiguous or not order.groups else getattr(order, 'automatic_level', 1),
+                           order.explanations, order.hypothesis, getattr(order, 'plane_groups', ()))
         if all(s.kind == 'face' and s.geometry == 'plane' for s in seeds) and any(not s.contours for s in seeds):
             return Ranking(tuple(rows), tuple(tuple(tier) for tier in tiers),
                            tuple(field for field, _ in features), True, tuple(distances), 0,
@@ -164,7 +167,7 @@ def _rank_base(snapshot, examples, exclusions=(), tolerance=None, *, criterion='
 def rank(snapshot, examples, exclusions=(), tolerance=None, *, criterion='auto'):
     examples, exclusions = tuple(examples), tuple(exclusions)
     base = _rank_base(snapshot, examples, exclusions, tolerance, criterion=criterion)
-    if criterion != 'auto' or not examples:
+    if criterion != 'auto' or not examples or base.hypothesis == 'curved_regions':
         return base
     from .plane_order import split_plane_groups, plane_class
     split = split_plane_groups(snapshot, base.tiers, examples, tolerance or Tolerance())

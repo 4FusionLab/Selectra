@@ -29,6 +29,7 @@ class Descriptor:
     face_angle: Optional[float] = None  # Radians; undefined on boundaries/nonmanifold edges.
     contours: tuple = ()  # Ordered trimmed planar loops, outer first, cm.
     planes: tuple = ()  # Edge support planes: (normal, point); a line can have several.
+    patch: tuple = ()  # BRep vertices, mesh points, triangles, oriented node normals.
 
     def __post_init__(self):
         for field in ('direction', 'normal', 'position'):
@@ -50,6 +51,18 @@ class Descriptor:
         if any(not any(normal) for normal, _ in planes):
             raise ValueError('Support plane normals must be nonzero.')
         object.__setattr__(self, 'planes', planes)
+        object.__setattr__(self, 'patch', tuple(self.patch))
+        if self.patch:
+            landmarks, points, triangles, normals = (tuple(tuple(v) for v in part) for part in self.patch)
+            if any(len(v) != 3 or not all(isfinite(x) for x in v) for v in landmarks+points+normals):
+                raise ValueError('Surface patch vectors need three finite coordinates.')
+            if len(landmarks) > 64 or len(normals) != len(points) or len(points) > 1024 or len(triangles) > 2048:
+                raise ValueError('Invalid or oversized surface mesh.')
+            if any(not any(n) for n in normals):
+                raise ValueError('Surface mesh normals must be nonzero.')
+            if not triangles or any(len(v) != 3 or any(type(i) is not int or not 0 <= i < len(points) for i in v) for v in triangles):
+                raise ValueError('Surface mesh needs valid triangle indices.')
+            object.__setattr__(self, 'patch', (landmarks, points, triangles, normals))
 
 
 @dataclass(frozen=True)

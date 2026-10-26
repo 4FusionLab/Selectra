@@ -9,7 +9,7 @@ import json
 import adsk.core
 import adsk.fusion
 
-from .matching import Descriptor
+from .matching import Descriptor, _near
 from .snapshot import BodySnapshot
 from .walls import PlanarPatch, wall_probe_points, confirm_wall
 from .search_scope import merge_snapshots, component_contains, SCOPES
@@ -413,5 +413,58 @@ def read_search_scope(entities, mode='component'):
         if owner is None:
             raise ValueError('Examples are outside this scope. Start within one component, then choose All Components.')
         keys.append(maps[owner][str(entity.tempId)])
+    mesh_started = monotonic()
+    snapshot = enrich_curved(snapshot, references, keys)
+    totals['surface_mesh_seconds'] = monotonic()-mesh_started
+    totals['total_read_seconds'] = monotonic()-started
+    if not scope_current(guards) or monotonic()-started > SCOPE_BUDGET_SECONDS:
+        raise ValueError('Geometry changed while reading curved groups.')
     read_search_scope.last_timings = totals
     return snapshot, tuple(keys), references, skipped, source, tuple(guards)
+
+
+def enrich_curved(snapshot, references, examples):
+    """Read bounded native meshes only for possible roles of curved examples."""
+    seeds = tuple(snapshot.by_key[k] for k in examples)
+    if len(seeds) < 2 or not any(d.kind == 'face' and d.geometry != 'plane' for d in seeds):
+        return snapshot
+    started, entities, changed, mesh_faces = monotonic(), [], False, 0
+    for d in snapshot.entities:
+        eligible = d.kind == 'face' and any(
+            d.geometry == seed.geometry and _near(d.measure, seed.measure, .01, 1e-8)
+            and _near(d.perimeter, seed.perimeter, .01, 1e-6) for seed in seeds)
+        if eligible and not d.patch:
+            if monotonic()-started > READ_BUDGET_SECONDS:
+                raise ValueError('Curved-group reading exceeded its budget. No partial group was applied.')
+            mesh_faces += 1
+            if mesh_faces > 160:
+                raise ValueError('Curved-group reading exceeds 160 faces. Narrow the scope.')
+            face = references[d.key]
+            native = face.nativeObject or face
+            if native.vertices.count > 64:
+                raise ValueError('Curved face exceeds 64 BRep landmarks.')
+            calc = native.meshManager.createMeshCalculator()
+            if not calc:
+                raise ValueError('Could not create a curved-face mesh calculator.')
+            calc.surfaceTolerance = max(1e-5, min(1e-3, d.perimeter*1e-4))
+            mesh = calc.calculate()
+            if not mesh or mesh.nodeCount > 1024 or mesh.triangleCount > 2048:
+                raise ValueError('Curved face exceeds the supported surface mesh budget.')
+            def point(p):
+                if face.assemblyContext:
+                    p = p.copy()
+                    p.transformBy(face.assemblyContext.transform2)
+                return _vector(p)
+            def vector(v):
+                if face.assemblyContext:
+                    v = v.copy()
+                    v.transformBy(face.assemblyContext.transform2)
+                return _vector(v)
+            indices = mesh.nodeIndices
+            patch = (tuple(point(v.geometry) for v in native.vertices),
+                     tuple(point(p) for p in mesh.nodeCoordinates),
+                     tuple(tuple(indices[i:i+3]) for i in range(0, len(indices), 3)),
+                     tuple(vector(n) for n in mesh.normalVectors))
+            d, changed = replace(d, patch=patch), True
+        entities.append(d)
+    return replace(snapshot, entities=tuple(entities)) if changed else snapshot

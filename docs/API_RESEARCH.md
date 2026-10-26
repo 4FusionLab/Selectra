@@ -103,3 +103,9 @@ Magenta-наложение использует `CustomGraphicsShowThroughColorE
 Для нативных событий дополнение запускается как зарегистрированный add-in через Scripts API. Временный импорт entry point из MCP не заменяет этот жизненный цикл. [Scripts.addExisting](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/core_Scripts_addExisting.htm).
 
 При завершении набор фиксируется в execute, графика удаляется в destroy, затем короткий Timer только вызывает `fireCustomEvent`; обращения к модели остаются на основном потоке. В проверенном Fusion 2706.1.14 fireCustomEvent возвращал false, хотя callback выполнялся. Фактический успех подтверждается readback `activeSelections`, а не этим возвращаемым значением.
+
+## Триангуляция криволинейных групп, 26.10.2026
+
+Context7 `/autodeskfusion360/autodeskfusion360.github.io` не покрывает конкретные операции MeshManager, поэтому они дополнительно сверены по установленным Python definitions и официальным документам Autodesk: [createMeshCalculator](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/fusion_MeshManager_createMeshCalculator.htm), [TriangleMeshCalculator](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/fusion_TriangleMeshCalculator.htm), [nodeIndices](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/fusion_TriangleMesh_nodeIndices.htm). Это стабильный API, доступный с августа 2014; Preview API не используется.
+
+`BRepFace.meshManager.createMeshCalculator()` создаёт калькулятор, `surfaceTolerance` задаёт максимальное отклонение сетки в cm, `calculate()` возвращает TriangleMesh. Читаются nodeCoordinates, nodeIndices и normalVectors. Вычисления выполняются на nativeObject, точки и векторы переводятся в мировую систему occurrence.transform2. Созданная сетка не добавляется в документ; временная геометрия служит числовому снимку. На нативной копии пазов подтверждены нормали, NURBS/цилиндры, соответствие preview и OK, отсутствие остаточной графики.
