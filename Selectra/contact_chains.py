@@ -349,6 +349,9 @@ def read(entities, single_reader):
                 continue
             keys = tuple(sorted({key for item in ids for key in mapped[item]}))
             chains.append(ClosedChain(keys, sum(e.length for e in edges), not loop.isOuter, adapter.chain_planes(cap)))
+    if edge:
+        chains.extend(adapter.smooth_patch_chains(joined,mapped))
+        work.step()
     if not adapter.scope_current(all_guards):
         raise ValueError('The assembly changed while reading exact contacts.')
     return (snapshot, examples, refs, 0, candidates[0], tuple(guards), tuple(chains)), all_guards

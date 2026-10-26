@@ -484,6 +484,73 @@ def chain_planes(cap):
     return ((_vector(normal),_vector(point)),)
 
 
+def smooth_patch_chains(body, key_map):
+    """Add whole boundaries of tangential face patches, never open walks."""
+    from collections import Counter
+    from .patch_boundaries import closed_boundary_loops
+    from .plane_order import classify_planes
+    from .matching import Tolerance
+    from .chains import ClosedChain
+    native=body.nativeObject or body
+    started, visited, result=monotonic(),set(),[]
+    for first in native.faces:
+        if first.tempId in visited:
+            continue
+        region={first.tempId:first}
+        todo=[first]
+        while todo:
+            if monotonic()-started>READ_BUDGET_SECONDS:
+                raise ValueError('Smooth-contour analysis exceeded its budget. No partial contour was applied.')
+            for face in todo.pop().tangentiallyConnectedFaces:
+                face=face.nativeObject or face
+                if face.body==native and face.tempId not in region:
+                    region[face.tempId]=face
+                    todo.append(face)
+        visited.update(region)
+        if len(region)<2:
+            continue
+        face_edges=[]
+        edge_refs={}
+        counts=Counter()
+        for face in region.values():
+            keys=[]
+            for loop in face.loops:
+                for coedge in loop.coEdges:
+                    edge=coedge.edge;key=str(edge.tempId)
+                    keys.append(key);edge_refs[key]=edge;counts[key]+=1
+            face_edges.append(tuple(keys))
+        topology={}
+        for key,count in counts.items():
+            if count!=1:
+                continue
+            edge=edge_refs[key]
+            if edge.isDegenerate:
+                break
+            a,b=edge.startVertex,edge.endVertex
+            if a is None or b is None:
+                if not adsk.core.Circle3D.cast(edge.geometry):
+                    break
+                topology[key]=('circle:'+key,'circle:'+key)
+            else:
+                topology[key]=(a.tempId,b.tempId)
+        else:
+            for loop in closed_boundary_loops(face_edges,topology):
+                if any(not key_map.get(key) for key in loop):
+                    continue
+                keys=tuple(sorted({part for key in loop for part in key_map[key]}))
+                planes=None
+                for key in loop:
+                    support=[]
+                    for face in edge_refs[key].faces:
+                        view=face.createForAssemblyContext(body.assemblyContext) if body.assemblyContext else face
+                        support.extend(chain_planes(view))
+                    planes=tuple(support) if planes is None else tuple(p for p in planes if classify_planes((p,),support,Tolerance())=='coplanar')
+                    if not planes:
+                        break
+                result.append(ClosedChain(keys,sum(edge_refs[key].length for key in loop),False,planes or ()))
+    return tuple(result)
+
+
 def _read_single_chains(entities):
     """Closed edge loops or adjacent wall rings, strictly in the source body."""
     from .chains import ClosedChain
@@ -516,6 +583,8 @@ def _read_single_chains(entities):
                     if (all(key in refs for key in walls) and
                             all(a == b or b in snapshot.adjacency[a] for a,b in zip(walls,walls[1:]+walls[:1]))):
                         chains.append(ClosedChain(tuple(walls), perimeter, not loop.isOuter, chain_planes(cap)))
+    if kind(entities[0]) == 'edge':
+        chains.extend(smooth_patch_chains(source,{key:(key,) for key in refs}))
     if not source.isValid or body_stamp(source) != stamp:
         raise ValueError('Geometry changed while reading closed chains.')
     return snapshot, examples, refs, skipped, source, ((source, stamp),), tuple(chains)
