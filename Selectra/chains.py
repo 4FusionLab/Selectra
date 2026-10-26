@@ -1,6 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Closed BRep-loop candidates and reversible topology range, without adsk."""
-from collections import deque
 from dataclasses import dataclass
 from math import isfinite
 from .ranking import Ranking
@@ -36,17 +35,8 @@ class ChainSelection:
 
     def replace_examples(self, examples):
         examples = self.snapshot.require_keys(examples)
-        per_example = []
-        for seed in examples:
-            distances, todo = {seed: 0}, deque((seed,))
-            while todo:
-                key = todo.popleft()
-                for other in self.snapshot.adjacency[key]:
-                    if other not in distances:
-                        distances[other] = distances[key]+1
-                        todo.append(other)
-            per_example.append(distances)
-        through_all = bool(examples) and any(set(examples) <= set(chain.keys) for chain in self.chains)
+        example_keys = set(examples)
+        eligible = tuple(chain for chain in self.chains if example_keys and example_keys <= set(chain.keys))
         reference = ()
         t = Tolerance()
         if examples and self.snapshot.by_key[examples[0]].kind == 'edge':
@@ -55,42 +45,24 @@ class ChainSelection:
                 reference = tuple(plane for plane in seed_planes[0]
                                   if all(classify_planes((plane,),other,t)=='coplanar' for other in seed_planes[1:]))
         if not reference:
-            anchors = tuple(c for c in self.chains if c.planes and set(examples) <= set(c.keys))
+            anchors = tuple(c for c in eligible if c.planes)
             if anchors:
                 reference = min(anchors,key=lambda c:(not c.inner,c.perimeter,c.keys,c.planes)).planes
         classes = ('coplanar','parallel','other','unknown')
         # Duplicate cap boundaries can describe the same wall ring. Preserve
         # its strongest (inner/smallest) explanation, never repeat the ring.
         candidates = {}
-        for chain in self.chains if through_all else ():
-            hops_by_seed = [min((distances[k] for k in chain.keys if k in distances), default=None) for distances in per_example]
-            if any(h is None for h in hops_by_seed):
-                continue
-            hops = max(hops_by_seed)
+        for chain in eligible:
             relation = classes.index(classify_planes(chain.planes,reference,t)) if reference else 3
-            score = relation, hops, not chain.inner, chain.perimeter
+            score = relation, not chain.inner, chain.perimeter
             if chain.keys not in candidates or score < candidates[chain.keys]:
                 candidates[chain.keys] = score
         ordered = sorted(candidates, key=lambda keys: (candidates[keys], keys))
-        if ordered:
-            first_score=min(candidates[k] for k in ordered if set(examples)<=set(k))
-            primary=[k for k in ordered if candidates[k]==first_score]
-            ordered=primary+[k for k in ordered if candidates[k]!=first_score]
-        tiers, scores, planes, used = [], [], [], set(examples)
-        for keys in ordered:
-            score = candidates[keys]
-            new = set(keys)-used
-            # Keep the first contour even when it is one closed circular edge
-            # or a single cylindrical face already supplied as the example.
-            if not new and tiers:
-                continue
-            if scores and score[:-1] == scores[-1][:-1] and abs(score[-1]-scores[-1][-1]) <= 1e-8*max(1,score[-1]):
-                tiers[-1] = tuple(sorted(set(tiers[-1]) | new))
-            else:
-                tiers.append(tuple(sorted(new)))
-                scores.append(score)
-                planes.append(classes[score[0]])
-            used.update(keys)
+        # Each choice is a complete independent contour. Equal scores do
+        # not merge alternatives, and previously seen entities do not hide
+        # another valid loop assembled from the same edge set.
+        tiers = tuple(ordered)
+        planes = tuple(classes[candidates[keys][0]] for keys in ordered)
         self.ranking = Ranking((), tuple(tiers), (), not bool(tiers), automatic_level=1 if tiers else 0,
                                explanations=tuple('closed_chain' for _ in tiers), hypothesis='closed_chain',
                                plane_groups=tuple(planes) if reference else ())
@@ -102,7 +74,7 @@ class ChainSelection:
 
     @property
     def result(self):
-        return tuple(sorted(set(self.feedback.examples).union(*(set(t) for t in self.ranking.tiers[:self.level]))))
+        return self.ranking.tiers[self.level-1] if self.level else self.feedback.examples
 
     @property
     def boundary_group(self):

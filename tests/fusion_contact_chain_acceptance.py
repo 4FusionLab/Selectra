@@ -41,14 +41,16 @@ def prepare(entry):
     occurrence=design.rootComponent.occurrences.addNewComponent(pose)
     native=tuple(occurrence.component.bRepBodies.add(copy) for copy in (left,right))
     bodies=tuple(body.createForAssemblyContext(occurrence) for body in native)
-    edges=[];faces=[]
+    edges=[];faces=[];local_edges=[]
     for body in native:
         edge=next(e for e in body.edges if adsk.core.Arc3D.cast(e.geometry) and abs(e.geometry.center.z-.2)<1e-7)
         edges.append(edge.createForAssemblyContext(occurrence))
+        cap=next(f for f in body.faces if adsk.core.Plane.cast(f.geometry) and abs(f.pointOnFace.z-.2)<1e-7)
+        local_edges.append(tuple(e.createForAssemblyContext(occurrence) for e in cap.loops.item(0).edges))
         face=next(f for f in body.faces if adsk.core.Cylinder.cast(f.geometry))
         faces.append(face.createForAssemblyContext(occurrence))
     builtins._selectra_contact_test=dict(entry=entry,original=original,selection=selection,document=doc,
-        design=design,bodies=bodies,edges=tuple(edges),faces=tuple(faces))
+        design=design,bodies=bodies,edges=tuple(edges),faces=tuple(faces),local_edges=tuple(local_edges))
     app.activeViewport.fit()
     return {'exact_contact':True,'gaps_rejected':3,'partial_edge_overlap_rejected':True,'rotated':True}
 
@@ -70,6 +72,11 @@ def inspect(enabled=True):
     session=state['entry']._sessions[-1]
     assert session.chain and session.across_contact==enabled and session.contact_input.value==enabled
     assert not session.preview_error,session.preview_error
+    seeds=set(session.controller.feedback.examples)
+    eligible=tuple(c for c in session.controller.chains if seeds<=set(c.keys))
+    allowed={k for c in eligible for k in c.keys} or seeds
+    ranked=seeds.union(*(set(t) for t in session.controller.ranking.tiers))
+    assert ranked==allowed, (ranked,allowed)
     result=tuple(session.refs[k] for k in session.chosen_keys())
     expected=state['edges' if state['kind']=='edge' else 'faces']
     if enabled:
@@ -98,3 +105,19 @@ def finish():
     for entity in state['selection']:
         if entity.isValid: app.userInterface.activeSelections.add(entity)
     return {'exact_ok':len(actual),'graphics_clean':True,'restored':True}
+
+
+def inspect_local_variant():
+    state=builtins._selectra_contact_test
+    session=state['entry']._sessions[-1]
+    assert state['kind']=='edge' and len(session.controller.feedback.examples)==1
+    expected=state['local_edges'][0]
+    actual=tuple(session.refs[k] for k in session.chosen_keys())
+    assert len(actual)==len(expected) and all(e in actual for e in expected)
+    assert all(e.body==state['bodies'][0] for e in actual)
+    assert session.controller.result==session.controller.ranking.tiers[session.controller.level-1]
+    for renderer in session.renderer.renderers:
+        for key,graphic in renderer.graphics.items():
+            assert graphic.isVisible==(key in session.chosen_keys())
+    state['expected_ok']=actual
+    return {'local_variant_found':True,'count':len(actual),'level':session.controller.level,'no_accumulation':True}

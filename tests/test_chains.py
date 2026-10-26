@@ -18,7 +18,7 @@ class ChainTests(unittest.TestCase):
         s=ChainSelection(snapshot(),chains,('a',))
         self.assertEqual(s.result,tuple('abcd'))
         s.adjust_similarity(1)
-        self.assertEqual(s.result,tuple('abcdef'))
+        self.assertEqual(s.result,tuple('aef'))
         s.adjust_similarity(-1)
         self.assertEqual(s.result,tuple('abcd'))
         self.assertNotIn('g',s.result)
@@ -45,9 +45,9 @@ class ChainTests(unittest.TestCase):
                 ClosedChain(('s','u','v'),1))
         s=ChainSelection(snap,chains,('s',))
         self.assertEqual(s.result,('a','b','s'))
-        self.assertEqual(s.ranking.plane_groups,('coplanar','coplanar','parallel','other','unknown'))
+        self.assertEqual(s.ranking.plane_groups,('coplanar','other','unknown'))
         s.adjust_similarity(1)
-        self.assertEqual(s.result,('a','b','c','d','s'))
+        self.assertEqual(s.result,('s','x','y'))
         self.assertEqual(s.ranking,ChainSelection(snap,reversed(chains),('s',)).ranking)
 
     def test_plane_priority_is_invariant_to_rotated_reflected_world_frame(self):
@@ -71,7 +71,41 @@ class ChainTests(unittest.TestCase):
         self.assertEqual(s.result,('a','e','f'))
         self.assertTrue(s.can_apply)
         s.adjust_similarity(1)
-        self.assertEqual(s.result,tuple('abcdef'))
+        self.assertEqual(s.result,('a','e','f'))
+        self.assertEqual(len(s.ranking.tiers),1)
+
+    def test_every_range_excludes_contours_not_passing_through_all_examples(self):
+        chains=(ClosedChain(('a','b','c'),8,True),ClosedChain(('a','b','e'),10),
+                ClosedChain(('b','d'),1,True),ClosedChain(('a','f'),2,True))
+        s=ChainSelection(snapshot(),chains,('a','b'))
+        for level in range(len(s.ranking.tiers)+1):
+            s.set_level(level)
+            self.assertFalse({'d','f'} & set(s.result))
+            self.assertTrue({'a','b'} <= set(s.result))
+        self.assertEqual(s.result,('a','b','e'))
+
+    def test_later_variant_is_not_lost_when_all_its_edges_were_seen_before(self):
+        chains=(ClosedChain(('a','b','c'),3),ClosedChain(('a','d','e'),4),ClosedChain(('a','b','d'),5))
+        s=ChainSelection(snapshot(),chains,('a',))
+        for level,chain in enumerate(chains,1):
+            s.set_level(level)
+            self.assertEqual(s.result,chain.keys)
+            self.assertEqual(s.boundary_group,chain.keys)
+        self.assertEqual(len(s.ranking.tiers),3)
+
+    def test_local_split_boundary_remains_an_alternative_to_contact_contour(self):
+        plane=(((0,0,1),(0,0,0)),)
+        keys=('0:seed','0:rim','0:seam','1:other')
+        entities=tuple(Descriptor(k,'edge','line',1,scope_key='s',planes=plane) for k in keys)
+        snap=BodySnapshot('s','r',entities)
+        local=ClosedChain(('0:seed','0:rim','0:seam'),10,False,plane)
+        sewn=ClosedChain(('0:seed','0:rim','1:other'),5,True,plane)
+        s=ChainSelection(snap,(local,sewn),('0:seed',))
+        self.assertEqual(s.result,sewn.keys)
+        s.adjust_similarity(1)
+        self.assertEqual(s.result,local.keys)
+        self.assertNotIn('1:other',s.result)
+        self.assertEqual(ChainSelection(snap,(local,sewn),('0:seam',)).result,local.keys)
 
     def test_single_closed_edge_does_not_expand_to_unrelated_loops_immediately(self):
         s=ChainSelection(snapshot(),(ClosedChain(('a',),1,True),ClosedChain(('a','b','c'),4)),('a',))
@@ -89,4 +123,7 @@ class ChainTests(unittest.TestCase):
         chains=(ClosedChain(tuple('abc'),4,True),ClosedChain(tuple('abc'),5),ClosedChain(tuple('ade'),4,True))
         a=ChainSelection(snapshot(),chains,('a',)); b=ChainSelection(snapshot(),reversed(chains),('a',))
         self.assertEqual(a.ranking,b.ranking)
-        self.assertEqual(a.result,tuple('abcde'))
+        self.assertEqual(a.result,tuple('abc'))
+        a.adjust_similarity(1)
+        self.assertEqual(a.result,tuple('ade'))
+        self.assertEqual(len(a.ranking.tiers),2)

@@ -58,7 +58,11 @@ def inspect(first=True):
         expected=state['walls' if state['kind']=='face' else 'edges']
         assert len(refs)==len(expected) and all(entity in refs for entity in expected)
     else:
-        assert len(refs)>4
+        assert session.controller.level>1
+        first=state['walls' if state['kind']=='face' else 'edges']
+        assert set(refs)!=set(first)
+        assert all(session.refs[k] in refs for k in session.controller.feedback.examples)
+        assert tuple(sorted(session.chosen_keys()))==session.controller.ranking.tiers[session.controller.level-1]
     assert session.renderer.keys==session.chosen_keys()
     state['expected_ok']=refs
     return {'kind':state['kind'],'count':len(refs),'level':session.controller.level}

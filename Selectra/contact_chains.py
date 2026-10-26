@@ -290,15 +290,16 @@ def read(entities, single_reader):
     if len(group) == 1:
         result = single_reader(entities)
         return result, all_guards
-    snapshots, own_refs, guards = [], [], []
+    snapshots, own_refs, guards, local_chains = [], [], [], []
     for index in group:
         work.step()
         body = candidates[index]
         collection = body.edges if adapter.kind(entities[0]) == 'edge' else body.faces
         seeds = tuple(e for e in entities if e.body == body) or (collection.item(0),)
-        snap, _, refs, _, _ = adapter.read_snapshot(seeds, include_relations=False)
+        snap, _, refs, _, _, _, native_chains = single_reader(seeds)
         snapshots.append(snap)
         own_refs.append(refs)
+        local_chains.append(native_chains)
         guards.append((body, adapter.body_stamp(body)))
     snapshot, maps = merge_snapshots(snapshots, uuid4().hex, json.dumps([s.revision for s in snapshots]))
     refs = {maps[i][k]: entity for i, own in enumerate(own_refs) for k,entity in own.items()}
@@ -324,7 +325,11 @@ def read(entities, single_reader):
     for e in joined.edges:
         for a,b in combinations(tuple(str(f.tempId) for f in e.faces),2):
             neighbours[a].add(b);neighbours[b].add(a)
-    chains = []
+    # Sewing removes split-boundary edges. Their original body contours
+    # remain valid alternatives; contact adds choices rather than replacing
+    # the topology of the source bodies in the selection catalogue.
+    chains = [ClosedChain(tuple(maps[i][key] for key in chain.keys),chain.perimeter,chain.inner,chain.planes)
+              for i, own in enumerate(local_chains) for chain in own]
     for cap in joined.faces:
         for loop in cap.loops:
             work.step()

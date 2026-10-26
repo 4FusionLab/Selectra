@@ -82,7 +82,7 @@ class Session:
         self.info.isFullWidth = True
         if chain:
             self.contact_input = inputs.addBoolValueInput('selectra_contact', 'Chain across contact', True, '', True)
-            self.contact_input.tooltip = 'Cross complete exact face contact, as after Split Body. Gaps, partial contacts and overlap are excluded. Original bodies stay unchanged.'
+            self.contact_input.tooltip = 'Also find closed contours across complete exact face contact. Original body contours stay available. Gaps, partial contacts and overlap are excluded; bodies stay unchanged.'
         self.scope_input = inputs.addDropDownCommandInput('selectra_scope', 'Search Scope', adsk.core.DropDownStyles.TextListDropDownStyle)
         for mode, label in SCOPES:
             self.scope_input.listItems.add(label, mode == self.scope_mode, '')
@@ -95,14 +95,15 @@ class Session:
         self.exclusions_input.addSelectionFilter(selection_filter)
         self.exclusions_input.setSelectionLimits(0, 0)
         self.range_input = inputs.addIntegerSliderCommandInput(
-            'selectra_range', 'Chain Range' if chain else 'Similarity', 0, max(1, len(self.controller.ranking.tiers)), False)
-        self.range_input.setText('Closest', 'Broader')
+            'selectra_range', 'Contour' if chain else 'Similarity', 0, max(1, len(self.controller.ranking.tiers)), False)
+        self.range_input.setText('First' if chain else 'Closest', 'Last' if chain else 'Broader')
         if chain:
-            self.range_input.tooltip = 'Add the next whole closed contour with PgUp or =; remove it with PgDown or -.'
+            self.range_input.tooltip = 'Select the next whole closed contour through all examples with PgUp or =; select the previous with PgDown or -.'
             self.scope_input.isVisible = False
             self.exclusions_input.isVisible = False
-        self.range_input.tooltip = 'Include less similar items with PgUp; remove the least similar items with PgDown.'
-        hint = inputs.addTextBoxCommandInput('selectra_hint', '', 'PgUp / =: more | PgDown / -: fewer', 1, True)
+        if not chain:
+            self.range_input.tooltip = 'Include less similar items with PgUp; remove the least similar items with PgDown.'
+        hint = inputs.addTextBoxCommandInput('selectra_hint', '', 'PgUp / =: next | PgDown / -: previous' if chain else 'PgUp / =: more | PgDown / -: fewer', 1, True)
         hint.isFullWidth = True
         group = inputs.addGroupCommandInput('selectra_refine', 'Refine')
         group.isExpanded = False
@@ -217,7 +218,7 @@ class Session:
             return status+'\nNo closed contour passes through all examples.'
         if not self.controller.level:
             return status+'\nExamples only. PgUp / =: add a closed contour.'
-        status += '\nClosed contours: {} of {}'.format(self.controller.level,len(self.controller.ranking.tiers))
+        status += '\nContour through examples: {} of {}'.format(self.controller.level,len(self.controller.ranking.tiers))
         if self.controller.ranking.plane_groups:
             labels={'coplanar':'In the example plane','parallel':'In parallel planes','other':'In other planes','unknown':'Contour plane unavailable'}
             status += '\n'+labels[self.controller.ranking.plane_groups[self.controller.level-1]]
