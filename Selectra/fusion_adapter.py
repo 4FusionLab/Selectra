@@ -470,11 +470,11 @@ def enrich_curved(snapshot, references, examples):
     return replace(snapshot, entities=tuple(entities)) if changed else snapshot
 
 
-def read_chains(entities):
+def _read_single_chains(entities):
     """Closed edge loops or adjacent wall rings, strictly in the source body."""
     from .chains import ClosedChain
-    if len(entities) != 1:
-        raise ValueError('Select one edge or one wall face for Select Chain.')
+    if not entities or any(e.body != entities[0].body for e in entities):
+        raise ValueError('Disable contact only after removing examples from other bodies.')
     snapshot, examples, refs, skipped, source = read_snapshot(entities, include_relations=False)
     started, chains, count = monotonic(), [], 0
     stamp = body_stamp(source)
@@ -505,3 +505,35 @@ def read_chains(entities):
     if not source.isValid or body_stamp(source) != stamp:
         raise ValueError('Geometry changed while reading closed chains.')
     return snapshot, examples, refs, skipped, source, ((source, stamp),), tuple(chains)
+
+
+def read_chains(entities, across_contact=True):
+    if across_contact:
+        from .contact_chains import read
+        result, guards = read(entities, _read_single_chains)
+        read_chains.last_contact_guards = guards
+        return result
+    bodies = []
+    for entity in entities:
+        if entity.body not in bodies:
+            bodies.append(entity.body)
+    if len(bodies) <= 1:
+        result = _read_single_chains(entities)
+    else:
+        from .chains import ClosedChain
+        snapshots, refs_by_body, chains_by_body, guards, skipped = [], [], [], [], 0
+        for body in bodies:
+            snap, _, refs, omitted, _, own_guards, chains = _read_single_chains(tuple(e for e in entities if e.body == body))
+            snapshots.append(snap)
+            refs_by_body.append(refs)
+            chains_by_body.append(chains)
+            guards.extend(own_guards)
+            skipped += omitted
+        snapshot, maps = merge_snapshots(snapshots, uuid4().hex, json.dumps([s.revision for s in snapshots]))
+        refs = {maps[i][key]: entity for i, own in enumerate(refs_by_body) for key, entity in own.items()}
+        examples = tuple(next(key for key,value in refs.items() if value == e) for e in entities)
+        chains = tuple(ClosedChain(tuple(maps[i][key] for key in chain.keys),chain.perimeter,chain.inner)
+                       for i, own in enumerate(chains_by_body) for chain in own)
+        result = snapshot, examples, refs, skipped, bodies[0], tuple(guards), chains
+    read_chains.last_contact_guards = result[5]
+    return result

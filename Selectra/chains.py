@@ -29,22 +29,25 @@ class ChainSelection:
 
     def replace_examples(self, examples):
         examples = self.snapshot.require_keys(examples)
-        if len(examples) > 1:
-            raise ValueError('Select one edge or one wall face as the chain example.')
-        distances, todo = {k: 0 for k in examples}, deque(examples)
-        while todo:
-            key = todo.popleft()
-            for other in self.snapshot.adjacency[key]:
-                if other not in distances:
-                    distances[other] = distances[key]+1
-                    todo.append(other)
+        per_example = []
+        for seed in examples:
+            distances, todo = {seed: 0}, deque((seed,))
+            while todo:
+                key = todo.popleft()
+                for other in self.snapshot.adjacency[key]:
+                    if other not in distances:
+                        distances[other] = distances[key]+1
+                        todo.append(other)
+            per_example.append(distances)
+        through_all = bool(examples) and any(set(examples) <= set(chain.keys) for chain in self.chains)
         # Duplicate cap boundaries can describe the same wall ring. Preserve
         # its strongest (inner/smallest) explanation, never repeat the ring.
         candidates = {}
-        for chain in self.chains:
-            hops = min((distances[k] for k in chain.keys if k in distances), default=None)
-            if hops is None:
+        for chain in self.chains if through_all else ():
+            hops_by_seed = [min((distances[k] for k in chain.keys if k in distances), default=None) for distances in per_example]
+            if any(h is None for h in hops_by_seed):
                 continue
+            hops = max(hops_by_seed)
             score = hops, not chain.inner, chain.perimeter
             if chain.keys not in candidates or score < candidates[chain.keys]:
                 candidates[chain.keys] = score

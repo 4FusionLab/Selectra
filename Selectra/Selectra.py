@@ -47,6 +47,8 @@ def _active_entities(ui):
 class Session:
     def __init__(self, command, preselected=None, chain=False):
         self.chain = chain
+        self.across_contact = True
+        self.contact_guards = ()
         self.app = adsk.core.Application.get()
         self.document = self.app.activeDocument
         self.original = tuple(preselected) if preselected is not None else _active_entities(self.app.userInterface)
@@ -58,14 +60,15 @@ class Session:
         self.scope_notice = ''
         if chain:
             from .chains import ChainSelection
-            self.snapshot, examples, self.refs, self.skipped, self.source_body, self.scope_guards, chains = adapter.read_chains(self.original)
+            self.snapshot, examples, self.refs, self.skipped, self.source_body, self.scope_guards, chains = adapter.read_chains(self.original, self.across_contact)
+            self.contact_guards = adapter.read_chains.last_contact_guards
         else:
             self.snapshot, examples, self.refs, self.skipped, self.source_body, self.scope_guards = adapter.read_search_scope(self.original, self.scope_mode)
         self.original = tuple(self.refs[key] for key in examples)
         self.original_guards = tuple((body, stamp) for body, stamp in self.scope_guards
                                      if any(e.body == body for e in self.original))
         from time import monotonic
-        self.timings = {} if chain else dict(adapter.read_search_scope.last_timings)
+        self.timings = {} if self.chain else dict(adapter.read_search_scope.last_timings)
         analysis_started = monotonic()
         self.controller = ChainSelection(self.snapshot, chains, examples) if chain else SelectionSession(self.snapshot, examples)
         self.timings['initial_analysis_seconds'] = monotonic() - analysis_started
@@ -77,6 +80,9 @@ class Session:
         inputs = command.commandInputs
         self.info = inputs.addTextBoxCommandInput('selectra_info', '', '', 3, True)
         self.info.isFullWidth = True
+        if chain:
+            self.contact_input = inputs.addBoolValueInput('selectra_contact', 'Chain across contact', True, '', True)
+            self.contact_input.tooltip = 'Cross complete exact face contact, as after Split Body. Gaps, partial contacts and overlap are excluded. Original bodies stay unchanged.'
         self.scope_input = inputs.addDropDownCommandInput('selectra_scope', 'Search Scope', adsk.core.DropDownStyles.TextListDropDownStyle)
         for mode, label in SCOPES:
             self.scope_input.listItems.add(label, mode == self.scope_mode, '')
@@ -84,7 +90,7 @@ class Session:
         selection_filter = 'Edges' if self.snapshot.entities[0].kind == 'edge' else 'Faces'
         self.examples_input = inputs.addSelectionInput('selectra_examples', 'Examples', 'Add another example from this search scope')
         self.examples_input.addSelectionFilter(selection_filter)
-        self.examples_input.setSelectionLimits(1, 1 if chain else 0)
+        self.examples_input.setSelectionLimits(1, 0)
         self.exclusions_input = inputs.addSelectionInput('selectra_exclusions', 'Exclude', 'Show an item that should not be included')
         self.exclusions_input.addSelectionFilter(selection_filter)
         self.exclusions_input.setSelectionLimits(0, 0)
@@ -123,6 +129,25 @@ class Session:
         _bind(command.execute, Executed(self), self.bindings)
         _bind(command.destroy, Destroyed(self), self.bindings)
 
+    def current_guards(self):
+        guards = list(self.scope_guards)
+        for body, stamp in self.contact_guards:
+            if not any(body == known for known, _ in guards):
+                guards.append((body, stamp))
+        return tuple(guards)
+
+    def change_contact(self, enabled):
+        entities = tuple(self.refs[k] for k in self.controller.feedback.examples)
+        snapshot, examples, refs, skipped, source, guards, chains = adapter.read_chains(entities, enabled)
+        from .chains import ChainSelection
+        controller = ChainSelection(snapshot, chains, examples)
+        self.renderer.clear()
+        self.snapshot, self.refs, self.skipped = snapshot, refs, skipped
+        self.source_body, self.scope_guards = source, guards
+        self.contact_guards = adapter.read_chains.last_contact_guards
+        self.across_contact, self.controller = enabled, controller
+        self.renderer = self.make_renderer()
+
     def make_renderer(self):
         if len(self.scope_guards) == 1:
             return HighlightRenderer(self.source_body, self.source_body.revisionId)
@@ -153,7 +178,7 @@ class Session:
         self.source_body, self.scope_guards, self.scope_mode = source, guards, mode
         self.controller, self.renderer = controller, self.make_renderer()
         self.scope_notice = ''
-        self.timings = {} if chain else dict(adapter.read_search_scope.last_timings)
+        self.timings = {} if self.chain else dict(adapter.read_search_scope.last_timings)
         self.updating = True
         try:
             self.exclusions_input.clearSelection()
@@ -183,9 +208,24 @@ class Session:
             raise ValueError('Selection is outside the current search scope.')
         return self.snapshot.require_keys(keys)
 
+    def chain_status(self):
+        domain = ('Exact Contact · {} bodies'.format(len(self.scope_guards)) if self.across_contact
+                  else 'This Body' if len(self.scope_guards) == 1 else 'Separate Bodies · {}'.format(len(self.scope_guards)))
+        noun = 'edges' if self.snapshot.entities[0].kind == 'edge' else 'faces'
+        status = '{} {} · {}'.format(len(self.chosen_keys()), noun, domain)
+        if not self.controller.ranking.tiers:
+            return status+'\nNo closed contour passes through all examples.'
+        if not self.controller.level:
+            return status+'\nExamples only. PgUp / =: add a closed contour.'
+        return status+'\nClosed contours: {} of {}'.format(self.controller.level,len(self.controller.ranking.tiers))
+
     def preview(self):
         self.preview_error = ''
         self.sync_controls()
+        if self.chain and not self.controller.can_apply:
+            self.renderer.clear()
+            self.info.text = self.chain_status()
+            return
         if not self.controller.feedback.examples:
             self.renderer.clear()
             self.info.text = 'Select an example on ' + html.escape(self.source_body.name) + '.'
@@ -193,7 +233,7 @@ class Session:
         # a second pass here rolls back/redraws the overlay twice per gesture.
 
     def draw_preview(self):
-        if not adapter.scope_current(self.scope_guards):
+        if not adapter.scope_current(self.current_guards()):
             raise RuntimeError('Body geometry changed. Cancel and restart Select Similar.')
         previous, self.updating = self.updating, True
         try:
@@ -202,9 +242,7 @@ class Session:
             self.preview_error = ''
             noun = 'edges' if self.snapshot.entities[0].kind == 'edge' else 'faces'
             if self.chain:
-                self.info.text = ('{} {} · This Body'.format(len(keys), noun)
-                                  + ('\nClosed contours: {} of {}'.format(self.controller.level, len(self.controller.ranking.tiers))
-                                     if self.controller.ranking.tiers else '\nNo closed chain found. Choose another example.'))
+                self.info.text = self.chain_status()
                 return
             status = '{} of {} {} · {}'.format(len(keys), len(self.snapshot.entities), noun, dict(SCOPES)[self.scope_mode])
             labels = {'shape': 'Same trimmed shape and size',
@@ -249,8 +287,7 @@ class Menu(adsk.core.MarkingMenuEventHandler):
             if entities and all(adapter.kind(e) for e in entities):
                 if len({adapter.kind(e) for e in entities}) == 1:
                     args.linearMarkingMenu.controls.addCommand(ui.commandDefinitions.itemById(COMMAND_ID))
-                    if len(entities) == 1:
-                        args.linearMarkingMenu.controls.addCommand(ui.commandDefinitions.itemById(CHAIN_COMMAND_ID))
+                    args.linearMarkingMenu.controls.addCommand(ui.commandDefinitions.itemById(CHAIN_COMMAND_ID))
                     _diagnostics.append({'event': 'menu_added'})
         except Exception:
             _log()
@@ -317,7 +354,9 @@ class Changed(adsk.core.InputChangedEventHandler):
             return
         try:
             key = args.input.id
-            if key == 'selectra_scope':
+            if key == 'selectra_contact':
+                s.change_contact(s.contact_input.value)
+            elif key == 'selectra_scope':
                 s.change_scope(SCOPES[s.scope_input.selectedItem.index][0])
             elif key == 'selectra_range':
                 s.controller.set_level(s.range_input.valueOne)
@@ -342,6 +381,12 @@ class Changed(adsk.core.InputChangedEventHandler):
                 return
             s.preview()
         except Exception as error:
+            if args.input.id == 'selectra_contact':
+                s.updating = True
+                try:
+                    s.contact_input.value = s.across_contact
+                finally:
+                    s.updating = False
             if args.input.id == 'selectra_scope':
                 s.scope_notice = str(error)
                 s.updating = True
@@ -424,7 +469,7 @@ class Validated(adsk.core.ValidateInputsEventHandler):
         s = self.session
         try:
             args.areInputsValid = (bool(s.controller.feedback.examples) and getattr(s.controller, 'can_apply', True) and not s.preview_error
-                                   and adapter.scope_current(s.scope_guards)
+                                   and adapter.scope_current(s.current_guards())
                                    and s.input_keys(s.examples_input) == s.controller.feedback.examples
                                    and s.input_keys(s.exclusions_input) == s.controller.feedback.exclusions
                                    and all(s.refs[k].isValid for k in s.chosen_keys()))
@@ -439,7 +484,7 @@ class Executed(adsk.core.CommandEventHandler):
 
     def notify(self, args):
         s = self.session
-        if not adapter.scope_current(s.scope_guards):
+        if not adapter.scope_current(s.current_guards()):
             raise RuntimeError('Body changed before confirming the selection.')
         if not getattr(s.controller, 'can_apply', True):
             raise RuntimeError('Choose a closed chain before confirming.')
@@ -465,7 +510,7 @@ class Destroyed(adsk.core.CommandEventHandler):
             entities = (tuple(s.refs[k] for k in s.accepted_keys)
                         if s.accepted and completed else s.original)
             if _running:
-                guards = s.scope_guards if s.accepted and completed else s.original_guards
+                guards = s.current_guards() if s.accepted and completed else s.original_guards
                 _pending = (s.document, guards, entities)
                 if _pending_timer:
                     _pending_timer.cancel()

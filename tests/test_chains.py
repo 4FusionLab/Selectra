@@ -21,6 +21,15 @@ class ChainTests(unittest.TestCase):
         self.assertEqual(s.result,tuple('abcd'))
         self.assertNotIn('g',s.result)
 
+    def test_multiple_examples_require_one_closed_contour_through_all(self):
+        chains=(ClosedChain(tuple('abc'),3,True), ClosedChain(tuple('adef'),5,True))
+        s=ChainSelection(snapshot(),chains,('a','f'))
+        self.assertEqual(s.result,tuple('adef'))
+        self.assertTrue(s.can_apply)
+        bad=ChainSelection(snapshot(),chains,('b','f'))
+        self.assertFalse(bad.can_apply)
+        self.assertEqual(bad.result,('b','f'))
+
     def test_single_closed_edge_does_not_expand_to_unrelated_loops_immediately(self):
         s=ChainSelection(snapshot(),(ClosedChain(('a',),1,True),ClosedChain(('a','b','c'),4)),('a',))
         self.assertEqual(s.result,('a',))
@@ -32,7 +41,6 @@ class ChainTests(unittest.TestCase):
         s=ChainSelection(snapshot(),(),('a',))
         self.assertEqual(s.result,('a',))
         self.assertFalse(s.can_apply)
-        with self.assertRaises(ValueError): s.replace_examples(('a','b'))
 
     def test_equal_evidence_duplicates_and_input_order(self):
         chains=(ClosedChain(tuple('abc'),4,True),ClosedChain(tuple('abc'),5),ClosedChain(tuple('ade'),4,True))
