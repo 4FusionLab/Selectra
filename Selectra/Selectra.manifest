@@ -6,7 +6,7 @@
   "description": {
     "": "Selectra: select similar BRep edges and faces, or follow closed contours in Autodesk Fusion."
   },
-  "version": "1.0.0",
+  "version": "1.0.1",
   "runOnStartup": false,
   "supportedOS": "windows|mac"
 }

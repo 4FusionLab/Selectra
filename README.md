@@ -16,7 +16,7 @@
 
 Choose an edge or face, open the context menu, and let Selectra build your selection. Check the magenta highlight, adjust the range, and confirm. The result becomes ordinary Fusion selection, ready for your next modeling operation.
 
-**Selectra 1.0.0 brings two commands: Select Similar and Select Chain.** [Release notes →](docs/releases/1.0.0.md)
+**Selectra 1.0.1 brings two commands: Select Similar and Select Chain.** [Release notes →](docs/releases/1.0.1.md)
 
 | Command | What you can do |
 | --- | --- |
@@ -65,7 +65,7 @@ Select Similar finds the four matching full cylindrical walls. Select Chain foll
 
 ![Select Chain: a closed slot contour across two bodies](docs/images/select-chain-edges.png)
 
-[Wall-chain demo and release notes](docs/releases/1.0.0.md)
+[Wall-chain demo and release notes](docs/releases/1.0.1.md)
 
 ## Install
 
@@ -86,7 +86,7 @@ Similarity depends on the available geometry. An identical radius alone does not
 
 ## Documentation and support
 
-[User guide](docs/GUIDE.md) · [FAQ](docs/FAQ.md) · [Release notes](docs/releases/1.0.0.md)
+[User guide](docs/GUIDE.md) · [FAQ](docs/FAQ.md) · [Release notes](docs/releases/1.0.1.md)
 
 [Report a problem](https://github.com/4FusionLab/Selectra/issues/new/choose) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Code of conduct](CODE_OF_CONDUCT.md)
 

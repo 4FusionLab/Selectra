@@ -16,7 +16,7 @@
 
 Выберите ребро или грань, откройте контекстное меню и поручите Selectra собрать выделение. Проверьте Magenta-подсветку, измените диапазон и подтвердите результат. Он станет обычным выделением Fusion, готовым для следующей операции моделирования.
 
-**Selectra 1.0.0 включает две команды: Select Similar и Select Chain.** [Возможности выпуска →](docs/releases/1.0.0.ru.md)
+**Selectra 1.0.1 включает две команды: Select Similar и Select Chain.** [Возможности выпуска →](docs/releases/1.0.1.ru.md)
 
 | Команда | Что можно сделать |
 | --- | --- |
@@ -65,7 +65,7 @@ Select Similar находит четыре одинаковые полные ц�
 
 ![Select Chain: замкнутый контур паза через два тела](docs/images/select-chain-edges.png)
 
-[Демонстрация цепочки стенок и описание выпуска](docs/releases/1.0.0.ru.md)
+[Демонстрация цепочки стенок и описание выпуска](docs/releases/1.0.1.ru.md)
 
 ## Установка
 
@@ -86,7 +86,7 @@ Selectra работает с BRep-рёбрами и гранями. Эскизн
 
 ## Документация и поддержка
 
-[Руководство](docs/GUIDE.ru.md) · [Вопросы и ответы](docs/FAQ.ru.md) · [Возможности выпуска](docs/releases/1.0.0.ru.md)
+[Руководство](docs/GUIDE.ru.md) · [Вопросы и ответы](docs/FAQ.ru.md) · [Возможности выпуска](docs/releases/1.0.1.ru.md)
 
 [Сообщить о проблеме](https://github.com/4FusionLab/Selectra/issues/new/choose) · [Участие в проекте](CONTRIBUTING.ru.md) · [Безопасность](SECURITY.ru.md) · [Правила общения](CODE_OF_CONDUCT.ru.md)
 

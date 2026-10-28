@@ -603,6 +603,23 @@ def _read_single_chains(entities):
                         chains.append(ClosedChain(tuple(walls), perimeter, not loop.isOuter, chain_planes(cap)))
     if kind(entities[0]) == 'edge':
         chains.extend(smooth_patch_chains(source,{key:(key,) for key in refs}))
+    else:
+        from .face_strips import find_face_strips
+        faces, edges = {}, {}
+        for face in source.faces:
+            if monotonic()-started > READ_BUDGET_SECONDS:
+                raise ValueError('Face-strip analysis exceeded its time budget. No partial chain was applied.')
+            key = str(face.tempId)
+            if key in refs:
+                faces[key] = tuple(str(c.edge.tempId) for loop in face.loops for c in loop.coEdges)
+        for edge in source.edges:
+            if monotonic()-started > READ_BUDGET_SECONDS:
+                raise ValueError('Face-strip analysis exceeded its time budget. No partial chain was applied.')
+            a, b = edge.startVertex, edge.endVertex
+            vertices = (a.tempId, b.tempId) if a and b else None
+            edges[str(edge.tempId)] = {'vertices': vertices, 'faces': tuple(str(f.tempId) for f in edge.faces), 'length': edge.length}
+        for keys, perimeter, ratio in find_face_strips(faces, edges, (examples[0],), deadline=started+READ_BUDGET_SECONDS):
+            chains.append(ClosedChain(keys, perimeter, strip_ratio=ratio))
     if not source.isValid or body_stamp(source) != stamp:
         raise ValueError('Geometry changed while reading closed chains.')
     return snapshot, examples, refs, skipped, source, ((source, stamp),), tuple(chains)
@@ -633,7 +650,7 @@ def read_chains(entities, across_contact=True):
         snapshot, maps = merge_snapshots(snapshots, uuid4().hex, json.dumps([s.revision for s in snapshots]))
         refs = {maps[i][key]: entity for i, own in enumerate(refs_by_body) for key, entity in own.items()}
         examples = tuple(next(key for key,value in refs.items() if value == e) for e in entities)
-        chains = tuple(ClosedChain(tuple(maps[i][key] for key in chain.keys),chain.perimeter,chain.inner,chain.planes,chain.supplemental)
+        chains = tuple(ClosedChain(tuple(maps[i][key] for key in chain.keys),chain.perimeter,chain.inner,chain.planes,chain.supplemental,chain.strip_ratio)
                        for i, own in enumerate(chains_by_body) for chain in own)
         result = snapshot, examples, refs, skipped, bodies[0], tuple(guards), chains
     read_chains.last_contact_guards = result[5]

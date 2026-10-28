@@ -15,6 +15,7 @@ class ClosedChain:
     inner: bool = False
     planes: tuple = ()
     supplemental: bool = False
+    strip_ratio: float = None
 
     def __post_init__(self):
         object.__setattr__(self, 'keys', tuple(sorted(set(self.keys))))
@@ -24,6 +25,8 @@ class ClosedChain:
         object.__setattr__(self,'planes',planes)
         if not self.keys or not isfinite(self.perimeter) or self.perimeter <= 0:
             raise ValueError('A closed chain needs entities and a finite positive perimeter.')
+        if self.strip_ratio is not None and (not isfinite(self.strip_ratio) or self.strip_ratio < 0):
+            raise ValueError('Strip ratio must be finite and nonnegative.')
 
 
 class ChainSelection:
@@ -55,7 +58,9 @@ class ChainSelection:
         candidates = {}
         for chain in eligible:
             relation = classes.index(classify_planes(chain.planes,reference,t)) if reference else 3
-            score = relation, chain.supplemental, not chain.inner, chain.perimeter
+            strip = chain.strip_ratio
+            priority = 0 if strip is not None and strip < .1 else (2 if strip is not None else 1)
+            score = priority, strip if strip is not None else 0, relation, chain.supplemental, not chain.inner, chain.perimeter
             if chain.keys not in candidates or score < candidates[chain.keys]:
                 candidates[chain.keys] = score
         ordered = sorted(candidates, key=lambda keys: (candidates[keys], keys))
@@ -63,7 +68,7 @@ class ChainSelection:
         # not merge alternatives, and previously seen entities do not hide
         # another valid loop assembled from the same edge set.
         tiers = tuple(ordered)
-        planes = tuple(classes[candidates[keys][0]] for keys in ordered)
+        planes = tuple(classes[candidates[keys][2]] for keys in ordered)
         self.ranking = Ranking((), tuple(tiers), (), not bool(tiers), automatic_level=1 if tiers else 0,
                                explanations=tuple('closed_chain' for _ in tiers), hypothesis='closed_chain',
                                plane_groups=tuple(planes) if reference else ())

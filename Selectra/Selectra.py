@@ -65,6 +65,7 @@ class Session:
         else:
             self.snapshot, examples, self.refs, self.skipped, self.source_body, self.scope_guards = adapter.read_search_scope(self.original, self.scope_mode)
         self.original = tuple(self.refs[key] for key in examples)
+        self.chain_anchor = self.original[0] if chain else None
         self.original_guards = tuple((body, stamp) for body, stamp in self.scope_guards
                                      if any(e.body == body for e in self.original))
         from time import monotonic
@@ -137,8 +138,9 @@ class Session:
                 guards.append((body, stamp))
         return tuple(guards)
 
-    def change_contact(self, enabled):
-        entities = tuple(self.refs[k] for k in self.controller.feedback.examples)
+    def change_contact(self, enabled, entities=None):
+        if entities is None:
+            entities = tuple(self.refs[k] for k in self.controller.feedback.examples)
         snapshot, examples, refs, skipped, source, guards, chains = adapter.read_chains(entities, enabled)
         from .chains import ChainSelection
         controller = ChainSelection(snapshot, chains, examples)
@@ -147,6 +149,7 @@ class Session:
         self.source_body, self.scope_guards = source, guards
         self.contact_guards = adapter.read_chains.last_contact_guards
         self.across_contact, self.controller = enabled, controller
+        self.chain_anchor = entities[0]
         self.renderer = self.make_renderer()
 
     def make_renderer(self):
@@ -369,6 +372,10 @@ class Changed(adsk.core.InputChangedEventHandler):
                 s.controller.set_criterion(s.criterion_options[s.criterion_input.selectedItem.index][0])
             elif key == 'selectra_examples':
                 keys = s.input_keys(s.examples_input)
+                if s.chain and keys and s.chain_anchor not in tuple(s.refs[k] for k in keys):
+                    s.change_contact(s.across_contact, tuple(s.refs[k] for k in keys))
+                    s.preview()
+                    return
                 snapshot = s.snapshot if s.chain else adapter.enrich_curved(s.snapshot, s.refs, keys)
                 previous = s.controller.snapshot
                 s.controller.snapshot = snapshot

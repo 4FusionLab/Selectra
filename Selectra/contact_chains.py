@@ -328,7 +328,7 @@ def read(entities, single_reader):
     # Sewing removes split-boundary edges. Their original body contours
     # remain valid alternatives; contact adds choices rather than replacing
     # the topology of the source bodies in the selection catalogue.
-    chains = [ClosedChain(tuple(maps[i][key] for key in chain.keys),chain.perimeter,chain.inner,chain.planes,chain.supplemental)
+    chains = [ClosedChain(tuple(maps[i][key] for key in chain.keys),chain.perimeter,chain.inner,chain.planes,chain.supplemental,chain.strip_ratio)
               for i, own in enumerate(local_chains) for chain in own]
     for cap in joined.faces:
         for loop in cap.loops:
