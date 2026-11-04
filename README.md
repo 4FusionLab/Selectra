@@ -12,6 +12,8 @@
 
 <p align="center"><a href="https://github.com/4FusionLab/Selectra/releases"><strong>Download</strong></a> · <a href="README.ru.md">Русский</a> · <a href="https://github.com/4FusionLab/Selectra/issues/new/choose">Report a problem</a></p>
 
+Selectra is an open-source **Fusion 360 add-in** for selecting similar faces and edges, tracing closed edge loops, and finding matching BRep geometry across bodies and components.
+
 ## Pick the example. Keep the native selection.
 
 Choose an edge or face, open the context menu, and let Selectra build your selection. Check the magenta highlight, adjust the range, and confirm. The result becomes ordinary Fusion selection, ready for your next modeling operation.
@@ -89,6 +91,8 @@ Similarity depends on the available geometry. An identical radius alone does not
 [User guide](docs/GUIDE.md) · [FAQ](docs/FAQ.md) · [Release notes](docs/releases/1.0.1.md)
 
 [Report a problem](https://github.com/4FusionLab/Selectra/issues/new/choose) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Code of conduct](CODE_OF_CONDUCT.md)
+
+**Other Fusion 360 tools by 4FusionLab:** [Perfora — hole patterns](https://github.com/4FusionLab/Perfora) · [Ejix — extract solid volumes](https://github.com/4FusionLab/Ejix) · [RuEn — Russian-layout shortcuts](https://github.com/4FusionLab/RuEn) · [Planara — planned surface flattening](https://github.com/4FusionLab/Planara)
 
 ## A little workshop mythology
 
