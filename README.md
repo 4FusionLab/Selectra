@@ -12,11 +12,9 @@
 
 <p align="center"><a href="https://github.com/4FusionLab/Selectra/releases"><strong>Download</strong></a> · <a href="README.ru.md">Русский</a> · <a href="https://github.com/4FusionLab/Selectra/issues/new/choose">Report a problem</a></p>
 
-Selectra is an open-source **Fusion 360 add-in** for selecting similar faces and edges, tracing closed edge loops, and finding matching BRep geometry across bodies and components.
-
 ## Pick the example. Keep the native selection.
 
-Choose an edge or face, open the context menu, and let Selectra build your selection. Check the magenta highlight, adjust the range, and confirm. The result becomes ordinary Fusion selection, ready for your next modeling operation.
+Selectra is a **Fusion 360 add-in** for selecting similar BRep faces and edges and tracing closed contours across bodies and assemblies. Choose an edge or face, open the context menu, and let Selectra build your selection. Check the magenta highlight, adjust the range, and confirm. The result becomes ordinary Fusion selection, ready for your next modeling operation.
 
 **Selectra 1.0.1 brings two commands: Select Similar and Select Chain.** [Release notes →](docs/releases/1.0.1.md)
 
