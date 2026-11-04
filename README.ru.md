@@ -12,6 +12,8 @@
 
 <p align="center"><a href="https://github.com/4FusionLab/Selectra/releases"><strong>Скачать</strong></a> · <a href="README.md">English</a> · <a href="https://github.com/4FusionLab/Selectra/issues/new/choose">Сообщить о проблеме</a></p>
 
+**Selectra** — бесплатный аддон **Fusion 360** для автоматического выделения похожих граней и рёбер, поиска замкнутых контуров и совпадающей BRep-геометрии в телах и компонентах.
+
 ## Покажи пример. Получи обычное выделение Fusion.
 
 Выберите ребро или грань, откройте контекстное меню и поручите Selectra собрать выделение. Проверьте Magenta-подсветку, измените диапазон и подтвердите результат. Он станет обычным выделением Fusion, готовым для следующей операции моделирования.
@@ -89,6 +91,8 @@ Selectra работает с BRep-рёбрами и гранями. Эскизн
 [Руководство](docs/GUIDE.ru.md) · [Вопросы и ответы](docs/FAQ.ru.md) · [Возможности выпуска](docs/releases/1.0.1.ru.md)
 
 [Сообщить о проблеме](https://github.com/4FusionLab/Selectra/issues/new/choose) · [Участие в проекте](CONTRIBUTING.ru.md) · [Безопасность](SECURITY.ru.md) · [Правила общения](CODE_OF_CONDUCT.ru.md)
+
+**Другие аддоны Fusion 360 от 4FusionLab:** [Perfora — перфорация и узоры](https://github.com/4FusionLab/Perfora) · [Ejix — извлечение объёмов](https://github.com/4FusionLab/Ejix) · [RuEn — горячие клавиши при русской раскладке](https://github.com/4FusionLab/RuEn) · [Planara — будущая развёртка поверхностей](https://github.com/4FusionLab/Planara)
 
 ## Немного мифологии мастерской
 
