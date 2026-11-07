@@ -22,10 +22,10 @@ def source_files(root):
                   key=lambda p: p.relative_to(root).as_posix())
 
 
-def build(root=ROOT, output=None):
+def build(root=ROOT, output=None, version_override=None):
     root = Path(root).resolve()
     manifest = json.loads((root / 'Selectra/Selectra.manifest').read_text(encoding='utf-8'))
-    version = manifest['version']
+    version = version_override or manifest['version']
     if not re.fullmatch(r'\d+\.\d+\.\d+', version):
         raise ValueError('Manifest version must be X.Y.Z.')
     output = Path(output) if output is not None else root / 'dist'
@@ -43,6 +43,10 @@ def build(root=ROOT, output=None):
             info.create_system = 3
             info.external_attr = 0o100644 << 16
             content = path.read_bytes()
+            if version_override and path.relative_to(root).as_posix() == 'Selectra/Selectra.manifest':
+                metadata = json.loads(content.decode('utf-8'))
+                metadata['version'] = version
+                content = (json.dumps(metadata, ensure_ascii=False, indent=2) + '\n').encode('utf-8')
             if path.suffix != '.png':
                 content = content.replace(b'\r\n', b'\n')
             zipped.writestr(info, content)
@@ -55,6 +59,7 @@ def build(root=ROOT, output=None):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, help='Output directory (default: dist)')
+    parser.add_argument('--version', help='GitVersion MajorMinorPatch for the distributable')
     args = parser.parse_args()
-    for result in build(output=args.output):
+    for result in build(output=args.output, version_override=args.version):
         print(result)
