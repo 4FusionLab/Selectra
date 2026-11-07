@@ -39,6 +39,13 @@ jobs:
             echo "Tag does not match GitVersion MajorMinorPatch: $version" >&2
             exit 1
           fi
+          # A tag can only release a commit already integrated into the default branch.
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            git merge-base --is-ancestor "$GITHUB_SHA" origin/main || {
+              echo "Release tag must point to a commit reachable from main." >&2
+              exit 1
+            }
+          fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "GitVersion numeric release identity: $version"
   check:
