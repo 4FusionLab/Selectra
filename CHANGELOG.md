@@ -1,22 +1,24 @@
-# История изменений
+# Changelog
+
+[Русская версия](CHANGELOG.ru.md)
 
 ## 1.0.1 — 2026-10-28
 
-- **Select Chain** находит замкнутые полосы из смежных граней одного тела с двумя простыми границами. Узкий обод получает приоритет, в том числе при переходах по наклонным граням.
-- При смене исходного примера каталог перестраивается; прежние варианты контуров сохраняются. Перебор ограничен бюджетом.
-- В Fusion на macOS проверены предпросмотр, переключение вариантов и применение обода из четырёх граней на отдельной копии модели. 185 Python-тестов; нативная CAD-приёмка на Windows не проводилась.
+- **Select Chain** finds closed strips of adjacent faces of one body with two simple boundaries. A narrow rim takes priority, including transitions along inclined faces.
+- When the starting example changes, the catalog is rebuilt; previous contour options are retained. Enumeration is budget-limited.
+- Preview, option switching, and application of a four-face rim were tested in Fusion on macOS on a separate copy of a model. 185 Python tests; native CAD acceptance on Windows was not performed.
 
 ## 1.0.0 — 2026-10-26
 
-Первый стабильный выпуск Selectra для Autodesk Fusion.
+The first stable release of Selectra for Autodesk Fusion.
 
-- **Select Similar**: похожие BRep-рёбра, грани и связанные группы по одному или нескольким примерам; уточнения Examples, Exclude и Match.
-- Приоритет формы и размера, затем положение: плоскости примеров, параллельные, остальные.
-- **Search Scope**: This Body, This Component (по умолчанию, включая вложенную иерархию), All Components.
-- **Select Chain**: отдельные замкнутые контуры рёбер и обходы стенок. Каждый вариант проходит через все примеры и заменяет предыдущий.
-- Границы плавных групп и их промежуточных связных частей; исходные контуры Split Body сохраняются.
-- **Chain across contact**, включённая по умолчанию: переход через полный точный контакт граней без изменения исходных тел. Зазоры, частичное касание и объёмные пересечения не соединяются.
-- **PgUp/PgDown** и **=/-**, нативный ползунок, Magenta-подсветка до OK и восстановление исходного выбора по Cancel.
-- Русская и английская документация, демонстрационные снимки, воспроизводимый ZIP и SHA-256; сборка и публикация стабильных релизов по тегу через GitHub Actions.
+- **Select Similar**: similar BRep edges, faces, and connected groups from one or more examples, refined using Examples, Exclude, and Match.
+- Shape and size take priority, then position: example planes, parallel planes, then others.
+- **Search Scope**: This Body, This Component (default, including nested hierarchy), All Components.
+- **Select Chain**: separate closed edge contours and wall chains. Each option passes through every example and replaces the previous one.
+- Boundaries of smooth groups and their intermediate connected parts; original Split Body contours are preserved.
+- **Chain across contact**, on by default: transition across full exact face contact without changing source bodies. Gaps, partial contact, and volume intersections are not connected.
+- **PgUp/PgDown** and **=/-**, native slider, Magenta preview before OK, and restoration of the original selection on Cancel.
+- English and Russian documentation, demonstration images, reproducible ZIP and SHA-256; stable releases were built and published by tag via GitHub Actions.
 
-Проверки: 182 Python-теста; сборка и CI на macOS, Windows и Ubuntu. Нативные CAD-сценарии проверены в Fusion на macOS; нативная Windows-приёмка отдельно не выполнена. Подробнее — [протокол](docs/VALIDATION.md).
+Validation: 182 Python tests; build and CI on macOS, Windows, and Ubuntu. Native CAD scenarios were checked in Fusion on macOS; native Windows acceptance was not separately performed. See the [validation report](docs/VALIDATION.md).
