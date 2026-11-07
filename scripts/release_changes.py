@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
 """Decide whether a main-branch push changes shipped runtime or distribution inputs."""
 import argparse
 import fnmatch
