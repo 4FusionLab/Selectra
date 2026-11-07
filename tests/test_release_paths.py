@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
 """Regression checks for the repository's automatic runtime-release path policy.
 
 Match the pinned shared platform's positive/negative fnmatch allowlist semantics.
