@@ -19,6 +19,14 @@ This repository follows the organization-wide release contract. The **GitVersion
 6. Avoid opportunistic releases on a routine PR merge. When required release notes or project-specific approval/evidence is absent, skip publication safely rather than inventing notes or issuing an unintended version.
 7. A broken release is corrected by a new patch version. Existing public tags, release notes and downloadable files remain immutable.
 
+## Explicit release trigger (organization-wide)
+
+- A product GitHub Release starts **only** when an immutable version tag `vMAJOR.MINOR.PATCH` (stable) or `vMAJOR.MINOR.PATCH-IDENTIFIER` (prerelease) is deliberately pushed for a tested commit reachable from `main`. Routine branch pushes, PR merges, and manual CI runs are not release triggers. Previously published historical channel classifications are unchanged.
+- GitVersion.Tool **6.8.2** calculates the numeric `MajorMinorPatch`; the version tag must agree. Fusion manifests and ZIP filenames use the numeric version only, while the optional prerelease suffix belongs to the Git tag and GitHub Release metadata.
+- Existing tests, ZIP/manifest and SHA-256 integrity gates, reviewed release notes, native CAD acceptance, platform limitations and project-specific controls still apply. An invalid explicit release attempt must fail safely without publishing.
+- Never create or move version tags implicitly, retarget historical tags, overwrite published assets or mark prereleases Latest.
+- Repositories without an approved distribution pipeline **do not publish** from tags. Enabling publishing requires a separate reviewed PR. Non-release deployments remain independent.
+
 ## Repository-specific publishing gate
 
-Publication is triggered by an explicit `vX.Y.Z` tag (or an explicitly versioned prerelease tag) only after the three-platform CI matrix passes. Reviewed release notes live in `docs/releases/X.Y.Z.md`.
+Only an explicit version-tag push initiates publication, after all three OS CI packages pass byte-for-byte verification. Reviewed notes live in `docs/releases/X.Y.Z.md`. A routine main push or manual CI dispatch never publishes.
