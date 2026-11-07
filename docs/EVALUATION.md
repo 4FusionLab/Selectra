@@ -1,64 +1,66 @@
-# Оценка инженерных итераций Selectra
+# Evaluation of Selectra engineering iterations
 
-## Методика
+English | [Русский](EVALUATION.ru.md)
 
-Baseline — неизменённый алгоритм `ranking.py` из `c5ac432`, сохранённый в `evaluation/baseline_c5ac432.py`. Отличается только путём импорта чистых типов `Tolerance` и `_angle`. Новая реализация сравнивается с ним на одном корпусе `evaluation/corpus.py`.
+## Method
 
-Корпус **синтетический**, без пользовательских моделей. Метки заданы задачей: одинаковая длина/ось; второй пример; исключение; неразличимое исключение; U/T-контуры с одинаковыми площадью, периметром и числом сторон; перенос/поворот/отражение; смещение отверстия; последовательность аналог → своя стенка → стенка аналога; пустая полость; близкие размерные семейства.
+The baseline is the unchanged `ranking.py` algorithm from `c5ac432`, saved in `evaluation/baseline_c5ac432.py`. Only the import path for the pure `Tolerance` and `_angle` types differs. The new implementation is compared with it on the same `evaluation/corpus.py` corpus.
 
-Команда: `python3 scripts/evaluate_selection.py --json artifacts/evaluation/results.json`.
+The corpus is **synthetic**, with no user models. Task labels cover equal length/axis; a second example; exclusion; an indistinguishable exclusion; U/T contours with equal area, perimeter and side count; translation/rotation/reflection; a shifted hole; the sequence analogue → its own wall → analogue's wall; an empty cavity; and nearby size families.
 
-Измеряются:
+Command: `python3 scripts/evaluate_selection.py --json artifacts/evaluation/results.json`.
 
-- Точное совпадение первого предложения с целевым набором. Для многошагового сценария стенки первый набор сравнивается с первым checkpoint, достижимость и шаги — с конечной целью.
-- Precision/recall только добавленных кандидатов; явные примеры не дают бесплатных правильных ответов. При пустом правильном и предсказанном добавлении обе метрики равны 1.
-- Достижимость целевого набора каким-либо вложенным диапазоном и минимальное число шагов PgUp/PgDown от автоматического диапазона. Недостижимость показывается явно, не заменяется числом действий.
-- Отдельные промежуточные наборы сценария стенки.
-- Стоимость уже заданной обратной связи: второй пример и Exclude считаются отдельными действиями. Это ручные сценарии; оптимальность стратегии пользователя не заявляется.
-- Сохранение всех групп при преобразовании координат, отражении, перестановке примеров и замене идентификаторов. Камера в снимок не входит; UI-устойчивость проверяется отдельно.
-- Медиана времени чистого ранжирования в Python. Чтение BRep, подсветка, задержка UI и Fusion здесь **не измеряются**.
+The measurements are:
 
-## Результаты
+- Exact match between the first proposal and the target set. For the multi-step wall scenario, the first set is compared with the first checkpoint, and reachability and steps with the final target.
+- Precision/recall for added candidates only; explicit examples do not provide free correct answers. When both the correct and predicted additions are empty, both metrics equal 1.
+- Reachability of the target set by some nested range and the minimum number of PgUp/PgDown steps from the automatic range. Unreachable targets are reported explicitly, not replaced by an action count.
+- Separate intermediate sets in the wall scenario.
+- Cost of feedback already specified: a second example and Exclude are separate actions. These are manual scenarios; user strategy optimality is not claimed.
+- Preservation of all groups under coordinate transformations, reflection, example reordering and identifier replacement. The camera is not part of the snapshot; UI stability is checked separately.
+- Median pure Python ranking time. BRep reading, highlighting, UI latency and Fusion are **not measured** here.
 
-Предварительный офлайн-прогон 25.10.2026 после интеграции контрактов `Descriptor.contours` и `BodySnapshot.wall_pairs`:
+## Results
 
-| Корпус / алгоритм | Точный первый набор | Достижимость цели | Precision / recall дополнительных кандидатов | Инвариантность |
+Preliminary offline run on 2026-10-25 after integrating the `Descriptor.contours` and `BodySnapshot.wall_pairs` contracts:
+
+| Corpus / algorithm | Exact first set | Target reachability | Precision / recall of added candidates | Invariance |
 | --- | --- | --- | --- | --- |
-| Разработка, baseline | 5/11 | 7/11 | 0.697 / 0.758 | 11/11 |
-| Разработка, текущий | 11/11 | 11/11 | 1.000 / 1.000 | 11/11 |
-| Дополнительные сложные задачи, baseline | 2/6 | 4/6 | 0.500 / 0.750 | 6/6 |
-| Дополнительные сложные задачи, текущий | 5/6 | 6/6 | 1.000 / 0.917 | 6/6 |
+| Development, baseline | 5/11 | 7/11 | 0.697 / 0.758 | 11/11 |
+| Development, current | 11/11 | 11/11 | 1.000 / 1.000 | 11/11 |
+| Additional challenging tasks, baseline | 2/6 | 4/6 | 0.500 / 0.750 | 6/6 |
+| Additional challenging tasks, current | 5/6 | 6/6 | 1.000 / 0.917 | 6/6 |
 
-Дополнительные задачи (`holdout_tasks`) размечены после первичной интеграции и выводятся отдельно: поворот профиля на другую координатную плоскость, криволинейный отвлекающий элемент, неизвестный контур кандидата, неизвестный контур примера, исключение конгруэнтного аналога, два разных повторяющихся семейства с третьим исключённым профилем. Это ручные дополнительные примеры, не статистически независимая оценка рынка.
+Additional tasks (`holdout_tasks`) were labelled after the initial integration and are reported separately: rotating a profile into another coordinate plane, a curved distractor, an unknown candidate contour, an unknown example contour, excluding a congruent analogue, and two different recurring families with a third excluded profile. These are additional manually designed examples, not a statistically independent market evaluation.
 
-В первом прогоне дополнительных задач обнаружены два ограничения. Отсутствие контура примера исправлено: автоматический режим сохраняет примеры и сообщает неоднозначность, вместо включения ложной формы по scalar tie. В последующей проверке нескольких пользовательских областей введено объединение проверенных семейств для несвязанных плоских примеров. Задача двух разных семейств теперь даёт точный первый набор; метка задачи сохранена. Итоговые числа нужно переснять после доработок и CAD-приёмки.
+The first additional run found two limitations. The missing example contour case was fixed: automatic mode retains the examples and reports ambiguity instead of including a false shape on a scalar tie. A later check of multiple user regions introduced the union of verified families for disconnected planar examples. The two-family task now produces the exact first set; its label was retained. Final numbers need to be measured again after further changes and CAD acceptance.
 
-Сценарий стенки в текущем алгоритме проходит три заданных набора в нужном порядке; от первого предложения до конечной цели требуется два PgUp. Baseline не может выразить промежуточную пару отдельно от других равных по scalar-признакам внутренних граней. Превышение бюджета контура (513 точек) отдельно проверено как контролируемый отказ без частичного ранжирования.
+The wall scenario in the current algorithm passes the three specified sets in order; two PgUp steps are needed from the first proposal to the final target. The baseline cannot express the intermediate pair separately from other interior faces with equal scalar features. Exceeding the contour budget (513 points) was separately verified as a controlled failure without partial ranking.
 
-После завершения геометрической интеграции итоговые количества не изменились. Сумма медиан чистого анализа по 11 маленьким задачам составила примерно 0.34 ms baseline и 2.54 ms текущего алгоритма (5 повторов на задачу). Это локальная микрооценка, не показатель задержки команды и не масштабируемости. Машинный отчёт с хэшами исходников сохраняется локально в ignored `artifacts/evaluation/results.json`.
+After geometric integration was completed, the final counts did not change. The sum of median pure analysis times across 11 small tasks was approximately 0.34 ms for the baseline and 2.54 ms for the current algorithm (five repeats per task). This is a local microbenchmark, not command latency or a scalability measure. A machine-readable report with source hashes is saved locally in the ignored `artifacts/evaluation/results.json`.
 
-## Нативная проверка и практическая полезность
+## Native validation and practical value
 
-На отдельной синтетической CAD-детали подтверждены первое предложение и оба дальнейших уровня пар стенки, реальные PgUp/PgDown, OK/Cancel, сохранность области, отсутствие остаточной графики и неизменность модели. Два примера стенки сразу дали обе соответствующие пары; два соседних примера — геометрически повторённые узлы. Полный протокол и воспроизводимая фикстура — [VALIDATION.md](VALIDATION.md).
+On a separate synthetic CAD part, the first proposal and both subsequent wall-pair levels, actual PgUp/PgDown, OK/Cancel, scope preservation, absence of residual graphics and an unchanged model were confirmed. Two wall examples immediately produced both corresponding pairs; two adjacent examples produced geometrically repeated groups. The full protocol and reproducible fixture are in [VALIDATION.md](VALIDATION.md).
 
-Разделённые времена первого запуска: чтение BRep 2.37 ms, топология 0.58 ms, отношения/материал 1.77 ms, чистый анализ 0.48 ms, графика 70.16 ms. Для повторяющегося узла — анализ 1.40 ms, графика 91.53 ms. Графика оказалась основной стоимостью этой малой детали. Изменение диапазона использует готовые данные, без повторного чтения BRep.
+Separated first-run times: BRep reading 2.37 ms, topology 0.58 ms, relations/material 1.77 ms, pure analysis 0.48 ms, graphics 70.16 ms. For a repeated group, analysis was 1.40 ms and graphics 91.53 ms. Graphics were the main cost for this small part. Changing the range uses cached data without rereading BRep.
 
-Дополнительный read-only smoke на открытой детали из 39 граней: полное чтение 149.67 ms, анализ 9.22 ms, 6 диапазонов. Это подтверждение отсутствия регрессии области/чтения, а не разметка правильности предложения на пользовательской задаче. Точные пользовательские геометрические данные в корпус не сохранялись.
+An additional read-only smoke test on an open 39-face part measured 149.67 ms for full reading, 9.22 ms for analysis and six ranges. This checks for scope/reading regressions; it does not label proposal correctness on a user task. Exact user geometry was not saved in the corpus.
 
-При ревью обнаружено, что пять глубин точечных проб не доказывают непрерывность материала. Нативный эксперимент с узкой полостью между пробами воспроизвёл ложное подтверждение; добавленные BRep-ray пересечения всей контрольной трассы устранили его. Поперёк перекрытия остаются дискретные трассы — вся объёмная стенка не доказана.
+Review found that five point-sampling depths do not prove material continuity. A native experiment with a narrow cavity between samples reproduced a false confirmation; added BRep-ray intersections along the full test path eliminated it. Paths across the overlap remain discrete, so the entire wall volume is not proven.
 
-Повтор группы проверяется одной общей 3D-трансформацией. Ложный повтор с одинаковыми формами концов и толщиной, но иным тангенциальным смещением, отклоняется регрессионным тестом. При бюджете или неизвестных данных анализ явно неполон, применение частичного набора не выполняется.
+A repeated group is checked using one common 3D transformation. A false repeat with matching end shapes and thickness but different tangential offset is rejected by a regression test. When the budget is exceeded or data is unknown, analysis is explicitly incomplete and a partial set is not applied.
 
-Польза относительно baseline подтверждена для узкого корпуса: правильная форма при равных скалярах и выражаемые тремя уровнями стенки. Пользовательское время на реальных рабочих задачах ещё не измерено. Нельзя переносить 11/11 на произвольные CAD-модели.
+Value relative to the baseline is established for the narrow corpus: correct shape with equal scalar features and walls expressible in three levels. User time on real tasks has not yet been measured. The 11/11 result cannot be generalized to arbitrary CAD models.
 
-## Ограничения и следующие проверки
+## Limitations and further checks
 
-Области сборки и алиасы =/- внедрены отдельной итерацией. На нативной сборке из 10 видимых тел получены первые наборы 2 / 6 / 20 для This Body / This Component с дочерними компонентами / All Components. Мировая геометрия подсветки совпала с исходными proxy; OK сохранил точные сущности. На пользовательском проекте после устранения отказа по assemblyContext и оптимизации необязательных отношений полное чтение последнего снимка видимости заняло около 0.50 s для 338 граней, анализ — 0.074 s. Это отдельная проверка работоспособности, не новая метка точности корпуса. Подробности — в VALIDATION.
+Assembly scopes and +/- aliases were added in a separate iteration. On a native assembly of 10 visible bodies, the first sets contained 2 / 6 / 20 entities for This Body / This Component with children / All Components. World-space highlighting geometry matched the original proxies; OK preserved the exact entities. On a user project, after fixing an assemblyContext failure and optimizing optional relations, a full read of the last visibility snapshot took about 0.50 s for 338 faces and analysis took 0.074 s. This is a separate functionality check, not a new corpus accuracy label. See VALIDATION for details.
 
-Синтетический корпус мал и не позволяет оценивать распространённость пользовательских задач. Нужны размеченные реальные детали и STEP, повторяющиеся многогранные узлы, свободные поверхности, большие тела и Windows CAD. Дискретное нативное свидетельство материала не считается строгим объёмным доказательством стенки. Цели, не выражаемые диапазоном, остаются дефектами или ограничениями модели намерений, даже если precision первого набора выросла.
+The synthetic corpus is small and cannot estimate how common user tasks are. Labelled real parts and STEP files, repeated polyhedral groups, freeform surfaces, large bodies and Windows CAD are needed. Discrete native material evidence is not strict volumetric proof of a wall. Targets that cannot be expressed by a range remain defects or limitations of the intent model even if first-set precision improves.
 
-После введения порядка плоскостей 25.10.2026 development остаётся 11/11, holdout — 4/6 точных первых наборов и 6/6 достижимых целей, инвариантность 6/6. Историческая метка `holdout-spatial-rotation` ожидала немедленное объединение одинаковых форм в разных плоскостях; новое требование намеренно разделяет их, поэтому эта цель теперь достигается за один шаг. Метка сохранена без подгонки. Десять отдельных тестов плоскостей проверяют новый контракт, включая размеры, исключения, несколько примеров, неизвестные данные и преобразование координат. Нативное подтверждение: This Component 4→8→10, All Components 4→8→20 круговых кромок; точный перенос результата по OK и очистка графики проверены отдельно, см. VALIDATION.
+After plane ordering was introduced on 2026-10-25, development remained at 11/11, holdout at 4/6 exact first sets and 6/6 reachable targets, with 6/6 invariance. The historical `holdout-spatial-rotation` label expected immediate union of identical shapes in different planes; the new requirement deliberately separates them, so that target is now reached in one step. The label was retained without fitting it to the result. Ten separate plane tests check the new contract, including dimensions, exclusions, multiple examples, unknown data and coordinate transformations. Native confirmation: This Component 4→8→10, All Components 4→8→20 circular edges; exact transfer on OK and graphics cleanup were checked separately; see VALIDATION.
 
-После исправления нескольких областей development — 11/11, holdout — 5/6 первых наборов, 6/6 достижимых целей, precision/recall дополнительных кандидатов 1.000/0.917. `holdout-two-shape-families` теперь проходит сразу; пространственный поворот остаётся намеренно отдельным шагом по политике плоскостей. На локальном числовом снимке текущих двух фигурных граней пользовательской детали первый набор изменился с 26 до 6; анализ занял около 0.37 s. Снимок хранится только локально, в публичный корпус пользовательская геометрия не включена.
+After fixing multiple regions, development was 11/11, holdout 5/6 first sets and 6/6 reachable targets, with added-candidate precision/recall of 1.000/0.917. `holdout-two-shape-families` now passes immediately; spatial rotation remains an intentional separate step under the plane policy. On a local numeric snapshot of the two current shaped faces of a user part, the first set changed from 26 to 6; analysis took about 0.37 s. The snapshot is kept locally only; user geometry is not included in the public corpus.
 
-Итерация криволинейных пазов 26.10.2026 не меняет старые метки: development 11/11, holdout 5/6 первых наборов и 6/6 достижимых. Дополнительно выполнены семь регрессий групп и нативная последовательность 12→18→12 на несохранённой копии выбранных пазов, с точным OK и неизменностью исходных тел. Старые числа корпуса не являются оценкой точности нового класса NURBS-групп.
+The 2026-10-26 curved-groove iteration does not change the old labels: development 11/11, holdout 5/6 first sets and 6/6 reachable targets. Seven additional group regressions and a native 12→18→12 sequence on an unsaved copy of selected grooves were performed, with exact OK and unchanged original bodies. The old corpus numbers are not an accuracy evaluation of the new NURBS group class.
