@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
 """Release contract checks are offline and cannot publish anything."""
 import hashlib
 import json
