@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
 """Select reviewed notes when available; otherwise generate notes from commit history."""
 import argparse
 import subprocess
