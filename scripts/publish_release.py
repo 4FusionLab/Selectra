@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""Publish a stable GitHub Release using identical packages built by the CI matrix."""
+"""Publish a versioned GitHub Release using identical packages built by the CI matrix."""
 import argparse
 import hashlib
 import json
@@ -39,18 +39,25 @@ def validated_assets(artifacts, version):
     return packages[0][:2]
 
 
-def release_version(tag, manifest):
-    version = manifest['version']
-    if not re.fullmatch(r'\d+\.\d+\.\d+', version) or tag != 'v' + version:
-        raise ValueError('Release tag must exactly match manifest version.')
+def release_version(tag, manifest, expected_version=None):
+    version = expected_version or manifest['version']
+    if not re.fullmatch(r'\d+\.\d+\.\d+', version):
+        raise ValueError('Release version must be numeric MAJOR.MINOR.PATCH.')
+    if tag != 'v' + version and not re.fullmatch(
+        r'v' + re.escape(version) + r'-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*', tag
+    ):
+        raise ValueError('Release tag must match calculated GitVersion.')
     return version
 
 
 def main(artifacts):
     if os.environ.get('GITHUB_ACTIONS') != 'true' or os.environ.get('GITHUB_REF_TYPE') != 'tag':
         raise ValueError('Release publication must run in a GitHub Actions tag workflow.')
-    version = release_version(os.environ['GITHUB_REF_NAME'], json.loads(
-        (ROOT / 'Selectra/Selectra.manifest').read_text(encoding='utf-8')))
+    tag = os.environ['GITHUB_REF_NAME']
+    version = release_version(tag, json.loads(
+        (ROOT / 'Selectra/Selectra.manifest').read_text(encoding='utf-8')),
+        expected_version=os.environ['GITVERSION_VERSION'])
+    prerelease = tag != 'v' + version
     assets = validated_assets(artifacts, version)
     repository = os.environ['GITHUB_REPOSITORY']
     if repository != '4FusionLab/Selectra':
@@ -67,7 +74,6 @@ def main(artifacts):
         with urllib.request.urlopen(req, timeout=120) as response:
             return json.load(response)
 
-    tag = 'v' + version
     try:
         release = request(base + '/releases/tags/' + tag)
     except urllib.error.HTTPError as error:
@@ -77,8 +83,10 @@ def main(artifacts):
         notes += '\n\nBuilt and published by [GitHub Actions](https://github.com/' + repository
         notes += '/actions/runs/' + os.environ['GITHUB_RUN_ID'] + '). Commit: `' + os.environ['GITHUB_SHA'] + '`.\n'
         release = request(base + '/releases', 'POST', dict(tag_name=tag,
-            target_commitish=os.environ['GITHUB_SHA'], name='Selectra ' + version + ' — Stable',
-            body=notes, draft=True, prerelease=False))
+            target_commitish=os.environ['GITHUB_SHA'], name='Selectra ' + tag,
+            body=notes, draft=True, prerelease=prerelease))
+    if release['prerelease'] != prerelease:
+        raise ValueError('Existing release channel differs from the requested channel.')
     existing = {asset['name']: asset for asset in release['assets']}
     for path in assets:
         digest = 'sha256:' + hashlib.sha256(path.read_bytes()).hexdigest()
@@ -95,10 +103,13 @@ def main(artifacts):
             raise ValueError('Uploaded asset digest does not match CI package.')
     if release['draft']:
         release = request(base + '/releases/' + str(release['id']), 'PATCH',
-                          dict(draft=False, prerelease=False, make_latest='true'))
-    final = request(base + '/releases/latest')
-    if final['tag_name'] != tag or final['draft'] or final['prerelease']:
-        raise ValueError('Published release is not the expected latest Stable.')
+                          dict(draft=False, prerelease=prerelease,
+                               make_latest='false' if prerelease else 'true'))
+    final = request(base + '/releases/tags/' + tag)
+    if final['tag_name'] != tag or final['draft'] or final['prerelease'] != prerelease:
+        raise ValueError('Published release metadata does not match the requested channel.')
+    if not prerelease and request(base + '/releases/latest')['tag_name'] != tag:
+        raise ValueError('Published Stable release is not the expected Latest.')
     print(final['html_url'])
     for asset in final['assets']:
         print(asset['name'], asset.get('digest'), asset['browser_download_url'])
