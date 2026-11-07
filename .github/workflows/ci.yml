@@ -15,7 +15,34 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  version:
+    name: Resolve GitVersion release identity
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.gitversion.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Calculate GitVersion
+        id: gitversion
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet tool install GitVersion.Tool --tool-path "$RUNNER_TEMP/gitversion" --version 6.8.2
+          version="$("$RUNNER_TEMP/gitversion/dotnet-gitversion" /showvariable MajorMinorPatch)"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          if [[ "$GITHUB_REF" == refs/tags/v* ]] && \
+             [[ ! "$GITHUB_REF_NAME" =~ ^v${version}(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Tag does not match GitVersion MajorMinorPatch: $version" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "GitVersion numeric release identity: $version"
   check:
+    needs: version
     name: Python checks (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
@@ -37,7 +64,7 @@ jobs:
       - name: Check public metadata and documents
         run: python scripts/check_project.py
       - name: Build release ZIP and checksum
-        run: python scripts/build.py
+        run: python scripts/build.py --version "${{ needs.version.outputs.version }}"
       - name: Upload checked release package
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -49,7 +76,7 @@ jobs:
   release:
     name: Publish stable release from CI packages
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: check
+    needs: [version, check]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -66,7 +93,23 @@ jobs:
         with:
           pattern: Selectra-package-*
           path: dist/ci
-      - name: Verify all platform packages and publish Stable
+      - name: Verify all platform packages and calculated version
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          tag="$GITHUB_REF_NAME"
+          channel=stable
+          if [[ "$tag" != "v$RELEASE_VERSION" ]]; then channel=prerelease; fi
+          python scripts/release_contract.py --version "$RELEASE_VERSION" --tag "$tag" \
+            --channel "$channel" --manifest Selectra/Selectra.manifest \
+            --archive "dist/ci/Selectra-package-Linux/Selectra-$RELEASE_VERSION.zip" \
+            --archive "dist/ci/Selectra-package-macOS/Selectra-$RELEASE_VERSION.zip" \
+            --archive "dist/ci/Selectra-package-Windows/Selectra-$RELEASE_VERSION.zip" \
+            --notes "docs/releases/$RELEASE_VERSION.md"
+      - name: Publish validated release
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          GITVERSION_VERSION: ${{ needs.version.outputs.version }}
         run: python scripts/publish_release.py --artifacts dist/ci
