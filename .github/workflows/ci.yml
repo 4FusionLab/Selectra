@@ -102,6 +102,13 @@ jobs:
         with:
           pattern: Selectra-package-*
           path: dist/ci
+      - name: Generate release notes (shared platform)
+        uses: 4FusionLab/.github/.github/actions/release-notes@ad9d60ba4aabc494b4f2c85d6c566a50ca423751
+        with:
+          product: Selectra
+          version: ${{ needs.version.outputs.version }}
+          candidate: docs/releases/${{ needs.version.outputs.version }}.md
+          output: ${{ runner.temp }}/release-notes.md
       - name: Verify all platform packages and calculated version
         shell: bash
         env:
@@ -109,14 +116,23 @@ jobs:
         run: |
           set -euo pipefail
           tag="v$RELEASE_VERSION"
-          python scripts/release_notes.py --product Selectra --version "$RELEASE_VERSION" \
-            --output "$RUNNER_TEMP/release-notes.md" --candidate "docs/releases/$RELEASE_VERSION.md"
           python scripts/release_contract.py --version "$RELEASE_VERSION" --tag "$tag" \
             --channel stable --manifest Selectra/Selectra.manifest \
             --archive "dist/ci/Selectra-package-Linux/Selectra-$RELEASE_VERSION.zip" \
             --archive "dist/ci/Selectra-package-macOS/Selectra-$RELEASE_VERSION.zip" \
             --archive "dist/ci/Selectra-package-Windows/Selectra-$RELEASE_VERSION.zip" \
             --notes "$RUNNER_TEMP/release-notes.md"
+      - name: Verify all CI ZIPs and manifests (shared platform)
+        uses: 4FusionLab/.github/.github/actions/verify-archive@ad9d60ba4aabc494b4f2c85d6c566a50ca423751
+        with:
+          product: Selectra
+          version: ${{ needs.version.outputs.version }}
+          archives: |
+            dist/ci/Selectra-package-Linux/Selectra-${{ needs.version.outputs.version }}.zip
+            dist/ci/Selectra-package-macOS/Selectra-${{ needs.version.outputs.version }}.zip
+            dist/ci/Selectra-package-Windows/Selectra-${{ needs.version.outputs.version }}.zip
+          manifest: Selectra/Selectra.manifest
+          notes: ${{ runner.temp }}/release-notes.md
       - name: Publish validated release
         env:
           RELEASE_NOTES_FILE: ${{ runner.temp }}/release-notes.md
