@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Bounded exact induced-subgraph matching for connected same-body regions.
 
 This verifies adjacency, not just counts or degree signatures. A budget-hit

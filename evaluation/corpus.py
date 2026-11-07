@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Hand-labelled synthetic tasks; no user CAD geometry or native API objects.
 
 Labels express a task, not the current algorithm's output. In particular the

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Regression checks for the repository's automatic runtime-release path policy.
 
 Match the pinned shared platform's positive/negative fnmatch allowlist semantics.

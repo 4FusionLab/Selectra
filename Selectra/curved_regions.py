@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Bounded topology and sampled-surface matching of curved face groups.
 
 All faces share one rigid/reflected transform. Mesh nodes and triangle centres

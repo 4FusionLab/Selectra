@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Deterministic intent hypotheses over immutable snapshots; no Fusion imports.
 
 Lengths are cm, areas cm², angles radians. Scores are ranking heuristics,

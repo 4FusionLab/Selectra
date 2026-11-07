@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Inspect complete rankings without depending on native UI or wall extraction."""
 from statistics import median
 from time import perf_counter

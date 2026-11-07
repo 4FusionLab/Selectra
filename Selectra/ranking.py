@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Continuous, deterministic similarity ranking for every entity of one body.
 
 Distance is a geometric ranking score, not a probability. Examples teach

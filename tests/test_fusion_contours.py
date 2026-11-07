@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Adapter protocol regression: evaluator direction differs from BRep direction."""
 import importlib.util
 from pathlib import Path

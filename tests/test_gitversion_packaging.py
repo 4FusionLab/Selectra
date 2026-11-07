@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """GitVersion is embedded into Selectra ZIP while the source manifest remains intact."""
 import json
 from pathlib import Path

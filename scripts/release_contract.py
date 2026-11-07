@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Offline release artifact contract used by 4FusionLab add-ins.
 
 Does not create tags, mutate releases, access Fusion, or call GitHub.

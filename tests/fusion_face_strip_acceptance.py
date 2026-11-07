@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Native acceptance on a disposable copy of the currently selected face ring."""
 import builtins
 import adsk.core

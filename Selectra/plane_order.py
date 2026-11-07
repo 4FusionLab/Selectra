@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Refine equal geometric families by actual support planes, never screen depth."""
 from math import hypot
 

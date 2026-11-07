@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Disposable native acceptance using copies of the selected curved-face groups.
 
 The source document and bodies are never modified. Run prepare(entry), open(),

@@ -28,7 +28,7 @@ Selectra упрощает выделение BRep-рёбер и граней в 
 ## Проверка
 
 - Проверяй ядро: `python3 -m unittest discover -s tests -v`.
-- Для публичной обвязки дополнительно выполняй `python3 scripts/check_project.py` и `python3 scripts/build.py`. Сохраняй GPL-3.0-only и SPDX-заголовки. Перед релизом прочитай `docs/PUBLISHING.md`.
+- Для публичной обвязки дополнительно выполняй `python3 scripts/check_project.py` и `python3 scripts/build.py`. Сохраняй PolyForm Noncommercial 1.0.0 и соответствующие SPDX-заголовки. Перед релизом прочитай `docs/PUBLISHING.md`.
 - Для UI и adapter нужны проверки в настоящем Fusion по `docs/VALIDATION.md`. Выполняй их одной CAD-сессией на отдельном несохранённом документе; активный документ пользователя сохраняй нетронутым.
 - Отличай unit-тесты и проверку API definitions от живой CAD-приёмки. Точный выполненный объём смотри в `docs/VALIDATION.md`; результаты macOS не подтверждают Windows.
 - При завершении команды проверяй документ, текущую команду и валидность объектов перед отложенным переносом выбора. Храни event handlers до завершения сессии, освобождай при stop.

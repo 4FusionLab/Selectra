@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Live circular-hole plane priority in a rotated, repeated component."""
 import builtins
 import math

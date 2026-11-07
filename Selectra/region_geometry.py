@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """One bounded 3D isometry for a mapped region of planar trimmed faces.
 
 Topology provides the face correspondence. Geometry then verifies all loops

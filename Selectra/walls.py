@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Bounded planar wall evidence, independent of Fusion and live BRep objects.
 
 Normals must point OUT of the solid. Trimmed overlap is computed from a planar

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Find annular face strips from exact edge and vertex incidence."""
 from collections import Counter, defaultdict
 from time import monotonic

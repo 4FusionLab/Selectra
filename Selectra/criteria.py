@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Explicit Blender-style criteria; the automatic workflow does not require them.
 
 Multiple examples use union semantics here, unlike shared-intent inference.

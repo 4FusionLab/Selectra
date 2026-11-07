@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Explicit search domains; body-local topology stays isolated when combined."""
 from dataclasses import replace
 from .snapshot import BodySnapshot

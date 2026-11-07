@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Authorized sequential CAD fixture. Never discovered by Python unittest.
 
 Call prepare(entry), open_command(), inspect_preview() in SEPARATE UI turns.

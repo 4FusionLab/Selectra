@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Closed boundaries of a face patch from exact BRep incidence, without adsk."""
 from collections import Counter, defaultdict
 

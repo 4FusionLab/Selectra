@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Immutable snapshot of an authorized search domain; no live API objects."""
 from dataclasses import asdict, dataclass, field
 import json
