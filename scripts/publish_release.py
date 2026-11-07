@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import re
+import subprocess
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -51,13 +52,18 @@ def release_version(tag, manifest, expected_version=None):
 
 
 def main(artifacts):
-    if os.environ.get('GITHUB_ACTIONS') != 'true' or os.environ.get('GITHUB_REF_TYPE') != 'tag':
-        raise ValueError('Release publication must run in a GitHub Actions tag workflow.')
-    tag = os.environ['GITHUB_REF_NAME']
+    if os.environ.get('GITHUB_ACTIONS') != 'true' or os.environ.get('GITHUB_REF') != 'refs/heads/main':
+        raise ValueError('Automatic releases must run on the main-branch push after successful CI.')
+    tag = 'v' + os.environ['GITVERSION_VERSION']
     version = release_version(tag, json.loads(
         (ROOT / 'Selectra/Selectra.manifest').read_text(encoding='utf-8')),
         expected_version=os.environ['GITVERSION_VERSION'])
     prerelease = tag != 'v' + version
+    existing_tag = subprocess.run(
+        ['git', 'rev-parse', '-q', '--verify', 'refs/tags/' + tag + '^{commit}'],
+        cwd=ROOT, capture_output=True, text=True, check=False)
+    if existing_tag.returncode == 0 and existing_tag.stdout.strip() != os.environ['GITHUB_SHA']:
+        raise ValueError('Immutable version tag belongs to another commit: ' + tag)
     assets = validated_assets(artifacts, version)
     repository = os.environ['GITHUB_REPOSITORY']
     if repository != '4FusionLab/Selectra':
@@ -79,7 +85,9 @@ def main(artifacts):
     except urllib.error.HTTPError as error:
         if error.code != 404:
             raise
-        notes = (ROOT / 'docs/releases' / (version + '.md')).read_text(encoding='utf-8')
+        notes = Path(os.environ['RELEASE_NOTES_FILE']).read_text(encoding='utf-8')
+        if not notes.strip():
+            raise ValueError('Release notes must not be empty.')
         notes += '\n\nBuilt and published by [GitHub Actions](https://github.com/' + repository
         notes += '/actions/runs/' + os.environ['GITHUB_RUN_ID'] + '). Commit: `' + os.environ['GITHUB_SHA'] + '`.\n'
         release = request(base + '/releases', 'POST', dict(tag_name=tag,
