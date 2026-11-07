@@ -3,8 +3,8 @@
 ## Trigger
 
 - A direct push to `main` or a PR merge into `main` is the only normal release event. PR checks, manual CI dispatch and version-tag pushes **do not** initiate publication.
-- Before publishing, compare the entire `github.event.before..GITHUB_SHA` range, including renamed/deleted runtime files. A release is eligible **only** if the pushed commits change a shippable add-in/runtime file, runtime resource, native component, or explicitly designated distribution input.
-- The repository's `.github/release-paths.txt` is the audited allowlist; the pinned shared 4FusionLab runtime-changes Action enforces it. Changes limited to README, guides, design documents, screenshots, tests, CI workflows, repository policy or GitVersion config must not publish a release.
+- Before publishing, compare `GITHUB_SHA` to the newest **published** GitHub Release tag that is an ancestor of `main`. If no ZIP Release exists, use the original `github.event.before..GITHUB_SHA` push range. Deleted and renamed runtime files remain release-eligible.
+- The repository's `.github/release-paths.txt` remains the audited release allowlist. README, guides, tests and CI-only changes **do not independently create a release**. A docs-only push may recover an earlier failed runtime release when eligible changes since the last published tag are still pending.
 - All required existing CI checks must succeed before publishing. A failed gate means no release, no mutable tag and no replaced assets.
 
 ## Version and distribution
@@ -18,8 +18,10 @@
 
 Runtime allowlist: `Selectra/**`, `scripts/build.py`. All three operating-system packages must match byte-for-byte and contain the correct manifest.
 
-If a push changes no eligible runtime file, CI may run but the GitHub Release job is skipped, even when GitVersion computes a different candidate version.
+When no eligible runtime input has changed since the last published release, CI may run but publication is skipped even if GitVersion computes a different version. A failed publication is retried by the next push to `main` after all normal CI gates pass; existing released tags/assets are never overwritten.
 
 ## Shared release actions
 
 GitVersion 6.8.2, impact detection, release notes and ZIP/SHA-256 validation are shared Actions pinned to commit `ad9d60ba4aabc494b4f2c85d6c566a50ca423751` of `4FusionLab/.github`. Package assembly, release-specific safeguards and publication remain in this repository. Retired local `scripts/release_changes.py` and `scripts/release_notes.py` were removed only after consumer CI migrated.
+
+**Recovery platform:** The published-release classifier is pinned separately to `2e961620a068c3ad754f6e1be05fb6e4ac68e843` with `recover-unpublished: 'true'` and read-only `github.token`. Other shared actions retain the reviewed `ad9d60ba4aabc494b4f2c85d6c566a50ca423751` pin.
