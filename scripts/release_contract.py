@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
 """Offline release artifact contract used by 4FusionLab add-ins.
 
 Does not create tags, mutate releases, access Fusion, or call GitHub.
