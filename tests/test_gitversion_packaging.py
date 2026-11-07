@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
 """GitVersion is embedded into Selectra ZIP while the source manifest remains intact."""
 import json
 from pathlib import Path
