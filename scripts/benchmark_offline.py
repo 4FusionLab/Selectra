@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Measure numeric matching only; never imports or contacts Fusion."""
 import argparse
 from dataclasses import replace

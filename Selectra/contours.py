@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Bounded congruence of complete planar polygonal trims, without live CAD.
 
 The outer loop is first. All holes share its rigid transform; holes cannot

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Publish a versioned GitHub Release using identical packages built by the CI matrix."""
 import argparse
 import hashlib

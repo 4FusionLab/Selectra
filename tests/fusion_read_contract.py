@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Read-only contracts on an authorized open body. Not discovered by unittest.
 
 Pass the entry module of the registered running add-in, not a transient MCP

@@ -7,7 +7,7 @@
 
 <p align="center">
   <a href="https://github.com/4FusionLab/Selectra/actions/workflows/ci.yml"><img src="https://github.com/4FusionLab/Selectra/actions/workflows/ci.yml/badge.svg" alt="Проверки сборки"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="GPL-3.0 license"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-PolyForm--Noncommercial-blue" alt="PolyForm Noncommercial license"></a>
 </p>
 
 <p align="center"><a href="https://github.com/4FusionLab/Selectra/releases"><strong>Скачать</strong></a> · <a href="README.md">English</a> · <a href="https://github.com/4FusionLab/Selectra/issues/new/choose">Сообщить о проблеме</a></p>
@@ -96,4 +96,6 @@ Selectra работает с BRep-рёбрами и гранями. Эскизн
 
 Селектра — богиня выбора, хранительница замкнутых контуров и противница ручного выбора одних и тех же граней. Она из **собственной мифологии 4FusionLab**, с дружеским поклоном Древней Греции. Её соседка [Перфора](https://github.com/4FusionLab/Perfora), богиня отверстий, отвечает за узоры.
 
-[GPL-3.0-only](LICENSE). Независимый проект **4FusionLab**, не связанный с Autodesk и не одобренный Autodesk. Autodesk и Fusion — товарные знаки Autodesk, Inc.
+[PolyForm Noncommercial 1.0.0](LICENSE). Независимый проект **4FusionLab**, не связанный с Autodesk и не одобренный Autodesk. Autodesk и Fusion — товарные знаки Autodesk, Inc.
+
+Коммерческое использование за пределами разрешённых лицензией случаев возможно по отдельной договорённости с 4FusionLab.

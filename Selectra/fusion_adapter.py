@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Bounded read-only BRep snapshots. Initial spike: one root-component body."""
 from time import monotonic
 from dataclasses import replace

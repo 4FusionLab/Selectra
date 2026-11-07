@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Closed BRep-loop candidates and reversible topology range, without adsk."""
 from dataclasses import dataclass
 from math import isfinite

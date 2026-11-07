@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Selection operations on bounded, same-body adjacency snapshots."""
 from collections import deque
 import heapq

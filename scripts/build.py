@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Build a deterministic release ZIP using an explicit file allowlist."""
 import argparse
 import hashlib

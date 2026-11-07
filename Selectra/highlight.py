@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Transient, nonselectable exact BRep highlights; no CAD bodies or attributes."""
 from time import monotonic
 

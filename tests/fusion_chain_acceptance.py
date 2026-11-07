@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Disposable pocket for native Select Chain faces, edges and range keys."""
 import builtins
 import adsk.core

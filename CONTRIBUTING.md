@@ -35,4 +35,4 @@ Use Conventional Commits: `feat:`, `fix:`, `docs:`, `test:`, `ci:`, and `chore:`
 - The core receives numeric snapshots and does not import `adsk`. Runtime dependencies are the Python standard library and the Fusion API.
 - Similarity scores are heuristics, not probabilities of user intent.
 - Passing CI is not native CAD acceptance or proof of behavior in Fusion on Windows or macOS.
-- Contributions are provided under `GPL-3.0-only`. Preserve authorship and compatible notices when using third-party code.
+- Contributions are provided under `PolyForm Noncommercial 1.0.0`. Preserve authorship and compatible notices when using third-party code.

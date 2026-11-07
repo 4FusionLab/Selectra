@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Intent behavior, false positives and numerical boundaries (no adsk mocks)."""
 from dataclasses import replace
 from math import nan

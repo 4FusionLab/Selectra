@@ -7,7 +7,7 @@
 
 <p align="center">
   <a href="https://github.com/4FusionLab/Selectra/actions/workflows/ci.yml"><img src="https://github.com/4FusionLab/Selectra/actions/workflows/ci.yml/badge.svg" alt="Build checks"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="GPL-3.0 license"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-PolyForm--Noncommercial-blue" alt="PolyForm Noncommercial license"></a>
 </p>
 
 <p align="center"><a href="https://github.com/4FusionLab/Selectra/releases"><strong>Download</strong></a> · <a href="README.ru.md">Русский</a> · <a href="https://github.com/4FusionLab/Selectra/issues/new/choose">Report a problem</a></p>
@@ -96,4 +96,6 @@ Similarity depends on the available geometry. An identical radius alone does not
 
 Selectra is the goddess of choice, guardian of closed contours, and sworn enemy of picking the same faces by hand — from **4FusionLab's own mythology**, with a playful nod to ancient Greece. Her companion [Perfora](https://github.com/4FusionLab/Perfora), goddess of holes, takes care of the patterns.
 
-[GPL-3.0-only](LICENSE). An independent **4FusionLab** project, not affiliated with or endorsed by Autodesk. Autodesk and Fusion are trademarks of Autodesk, Inc.
+[PolyForm Noncommercial 1.0.0](LICENSE). An independent **4FusionLab** project, not affiliated with or endorsed by Autodesk. Autodesk and Fusion are trademarks of Autodesk, Inc.
+
+Commercial use outside the permitted purposes requires a separate agreement with 4FusionLab.

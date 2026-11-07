@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Validate public metadata, Python license headers and local Markdown links."""
 import json
 from pathlib import Path
@@ -24,11 +24,11 @@ def check(root=ROOT):
                 '.github/ISSUE_TEMPLATE/config.yml', '.github/PULL_REQUEST_TEMPLATE.md')
     for name in required:
         assert (root / name).is_file(), 'Missing: ' + name
-    assert 'GNU GENERAL PUBLIC LICENSE' in (root / 'LICENSE').read_text(encoding='utf-8')
+    assert 'PolyForm Noncommercial License 1.0.0' in (root / 'LICENSE').read_text(encoding='utf-8')
     for directory in ('Selectra', 'scripts', 'tests', 'evaluation'):
         for path in (root / directory).rglob('*.py'):
             assert path.read_text(encoding='utf-8').startswith(
-                '# SPDX-License-Identifier: GPL-3.0-only\n'), str(path)
+                '# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0\n'), str(path)
     documents = [p for p in root.rglob('*.md') if '.git' not in p.parts and 'dist' not in p.parts]
     for path in documents:
         text = path.read_text(encoding='utf-8')
