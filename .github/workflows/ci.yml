@@ -73,6 +73,13 @@ jobs:
         run: python scripts/check_project.py
       - name: Build release ZIP and checksum
         run: python scripts/build.py --version "${{ needs.version.outputs.version }}"
+      - name: Verify Fusion ZIP using shared contract (PR dry-run)
+        uses: 4FusionLab/.github/.github/actions/verify-archive@ad9d60ba4aabc494b4f2c85d6c566a50ca423751
+        with:
+          product: Selectra
+          version: ${{ needs.version.outputs.version }}
+          archives: dist/Selectra-${{ needs.version.outputs.version }}.zip
+          manifest: Selectra/Selectra.manifest
       - name: Upload checked release package
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
