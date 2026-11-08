@@ -1,73 +1,75 @@
-# Selectra: выбор по примерам
+# Selectra: selection by example
 
-## Задача
+[Русская версия](PRODUCT.ru.md)
 
-Пользователь показывает, что считает похожим, а Selectra предлагает выделение. Основной вход — `Select Similar` в меню правой кнопки. Отдельный `Select Chain` находит замкнутые петли рёбер и обходы стенок. Пользователь не должен начинать с выбора технической метрики.
+## Problem
 
-**Область поиска уточнена пользователем 25.10.2026:** This Body, This Component (по умолчанию), All Components. This Component включает вложенную иерархию выбранного экземпляра; All Components — всю видимую сборку. Примеры и исключения лежат в выбранной области. Область не расширяется неявно; её переключение видно в диалоге. Каноническая семантика — [UX.md](UX.md).
+The user shows what they consider similar, and Selectra proposes a selection. The main entry point is `Select Similar` in the right-click menu. A separate `Select Chain` finds closed edge loops and wall chains. The user should not have to begin by choosing a technical metric.
 
-Актуальный сценарий и элементы интерфейса: [UX.md](UX.md). Целевая модель вывода намерения: [INTENT_MODEL.md](INTENT_MODEL.md). PgUp/PgDown управляют ранжированным сходством; графовое соседство остаётся отдельной операцией.
+**Search scope clarified by the user on 25 October 2026:** This Body, This Component (default), All Components. This Component includes the selected instance's nested hierarchy; All Components includes the entire visible assembly. Examples and exclusions lie within the selected scope. Scope is not expanded implicitly; switching it is visible in the dialog. Canonical semantics: [UX.md](UX.md).
 
-## Основной сценарий
+For the current workflow and controls see [UX.md](UX.md). For the target intent-inference model see [INTENT_MODEL.md](INTENT_MODEL.md). PgUp/PgDown control ranked similarity; graph adjacency remains a separate operation.
 
-1. Выбрать одно или несколько рёбер либо граней одного тела.
-2. ПКМ → `Select Similar`. Геометрия считывается после запуска команды, а не на каждом открытии меню.
-3. Сразу увидеть лучший предложенный набор и число элементов. Примеры остаются в наборе. При неоднозначности — короткое объяснение.
-4. Нажать `OK`; получить обычное выделение Fusion и продолжить работу, например запустить Fillet. `Cancel` восстанавливает исходный выбор при неизменном контексте.
-5. Если результат не тот, уточнить примером или исключением. В нативном диалоге есть Examples и Exclude; уточнение пересчитывает ранжирование и сбрасывает ручной диапазон.
+## Main workflow
 
-В основной части — ползунок Similarity, который управляет тем же диапазоном, что и PgUp/PgDown. `Refine` свёрнут: необязательный Match и Reset Range. По умолчанию используется автоматическое ранжирование с размерным допуском 1% и угловым допуском 2°. Числовая дистанция не выводится как вероятность намерения.
+1. Select one or more edges or faces from one body.
+2. Right-click → `Select Similar`. Geometry is read after starting the command, not every time the menu opens.
+3. Immediately see the best proposed set and its count. Examples remain in the set. If ambiguous, show a brief explanation.
+4. Press `OK` to obtain an ordinary Fusion selection and continue working, for example by starting Fillet. `Cancel` restores the original selection if the context is unchanged.
+5. If the result is wrong, refine it with an example or exclusion. The native dialog has Examples and Exclude; refinement recalculates ranking and resets the manual range.
 
-## Как выводится намерение
+The main area contains the Similarity slider, which controls the same range as PgUp/PgDown. `Refine` is collapsed and contains optional Match and Reset Range. Automatic ranking defaults to a 1% dimensional and 2° angular tolerance. Numeric distance is not presented as an intent probability.
 
-Все сущности выбранного типа исходного тела получают непрерывную геометрическую оценку сходства. Общие признаки примеров определяют веса, различающиеся признаки перестают быть обязательными. Наборы с одинаковой оценкой включаются целиком. Исходное ядро отдельных гипотез сохранено для объяснений и сравнения; основное управление диапазоном использует общее ранжирование, а не переключение разрозненных наборов.
+## How intent is inferred
 
-Примеры:
+All entities of the selected type in the source body receive a continuous geometric similarity score. Shared example features determine weights; features that differ cease to be mandatory. Sets with equal scores are included as a whole. The original separate-hypothesis kernel is retained for explanations and comparison; main range control uses a shared ranking rather than switching disconnected sets.
 
-- Два прямых ребра разной длины, но одного направления → признак длины исключается, остаются параллельные рёбра.
-- Два ребра одной длины с разным направлением → направление перестаёт ограничивать набор.
-- Две цилиндрические грани одного радиуса с разными площадями → искать такой же радиус, не одинаковую площадь.
-- Две несвязанные плоские грани разных размеров с полными контурами → искать объединение подтверждённых аналогов каждого примера; общая нормаль не заменяет форму.
+Examples:
 
-Направление прямого ребра — ось: разворот параметризации на 180° ничего не меняет. В Automatic сравнивается ось нормали плоскости; явный Orientation использует направленный вектор и различает противоположные стороны. У кривой поверхности одна произвольная нормаль не описывает направление целиком.
+- Two straight edges of different lengths but the same direction → length is excluded as a feature, leaving parallel edges.
+- Two edges of the same length with different directions → direction no longer restricts the set.
+- Two cylindrical faces with the same radius and different areas → find the same radius, not the same area.
+- Two disconnected planar faces of different sizes with complete contours → find the union of verified analogues of each example; a shared normal does not replace shape.
 
-Если примеры не имеют устойчивого общего признака, инструмент сообщает об этом. Он не должен незаметно выбирать всё тело. Для несвязанных плоских примеров с полными контурами поддержано объединение проверенных семейств формы и размера. Связанные примеры по-прежнему могут задавать повтор узла, а пара сторон — семейство стенок. Связанные группы с цилиндрическими и NURBS-гранями дополнительно проверяются по триангуляции поверхности и общему расположению. Для остальных типов геометрии используются доступные общие признаки.
+A straight edge's direction is an axis: reversing its parameterization by 180° changes nothing. Automatic compares the axis of a planar normal; explicit Orientation uses a directed vector and distinguishes opposite sides. A single arbitrary normal does not describe the complete direction of a curved surface.
 
-## Каталог сценариев
+If examples have no stable common feature, the tool reports this. It must not silently select the entire body. For disconnected planar examples with complete contours, the union of verified shape-and-size families is supported. Connected examples can still describe a repeated feature, while opposite sides can describe a wall family. Connected groups with cylindrical and NURBS faces are additionally checked by surface triangulation and relative arrangement. Other geometry types use available shared features.
 
-| Пример | Ожидаемый смысл | Признаки и неоднозначности | Этап |
+## Scenario catalog
+
+| Example | Intended meaning | Features and ambiguity | Stage |
 | --- | --- | --- | --- |
-| Прямое ребро | Такие же по длине; параллельные; оба условия | Длина и ось. Второй пример различает намерение | Ядро spike |
-| Круговая кромка | Кромки такого же радиуса | Тип кривой + радиус; полный круг и дуга различаются | Ядро spike |
-| Дуга | Такой же радиус или радиус и длина | Не называть любой круг отверстием | Ядро spike |
-| Плоская грань | Такие же размеры/граница или ориентация | Площадь, периметр, число рёбер/петель, нормаль; не доказательство конгруэнтности | Ядро spike |
-| Цилиндрическая грань | Такой же радиус, иногда и площадь | Отверстие и наружный вал пока не различаются | Ядро spike |
-| Сквозное или глухое отверстие | Все отверстия такого же диаметра/типа | Внутренняя ориентация, ось, петли, дно, соседство | Семантика после CAD-spike |
-| Скругление | Все скругления такого же радиуса | Цилиндр/тор/свободная поверхность, соседние грани, выпуклость | После базового MVP |
-| Фаска | Все фаски такой же ширины/угла | Геометрия и соседство; одной площади мало | После базового MVP |
-| Цепочка рёбер | Касательно связанные или одинаковые цепочки | Граф соседства; отличать от штатной Tangent Chain | После базового MVP |
-| Карман/бобышка | Похожие группы граней | Топологический регион вместо отдельных граней | Отдельный этап |
-| Импорт STEP | Повторяющиеся элементы без истории | Геометрия и топология; история Hole/Pattern необязательна | CAD-корпус MVP |
-| Свободная поверхность | Повторяющиеся участки формы | Выборки кривизны, ориентации и границы; площадь лишь грубый фильтр | Исследование |
+| Straight edge | Same length; parallel; or both | Length and axis. A second example distinguishes intent | Kernel spike |
+| Circular edge | Edges of the same radius | Curve type + radius; distinguish a full circle and an arc | Kernel spike |
+| Arc | Same radius, or radius and length | Do not call every circle a hole | Kernel spike |
+| Planar face | Same dimensions/boundary or orientation | Area, perimeter, edge/loop counts, normal; not proof of congruence | Kernel spike |
+| Cylindrical face | Same radius, sometimes area | Holes and external shafts are not yet distinguished | Kernel spike |
+| Through or blind hole | All holes of the same diameter/type | Internal orientation, axis, loops, bottom, adjacency | Semantics after CAD spike |
+| Fillet | All fillets of the same radius | Cylinder/torus/freeform, neighboring faces, convexity | After basic MVP |
+| Chamfer | All chamfers of the same width/angle | Geometry and adjacency; area alone is insufficient | After basic MVP |
+| Edge chain | Tangentially connected or equivalent chains | Adjacency graph; distinguish from native Tangent Chain | After basic MVP |
+| Pocket/boss | Similar face groups | Topological region rather than individual faces | Separate stage |
+| STEP import | Repeated features without history | Geometry and topology; Hole/Pattern history is optional | MVP CAD corpus |
+| Freeform surface | Repeated shape regions | Curvature, orientation and boundary sampling; area is only a coarse filter | Research |
 
-Mesh, T-Spline и эскизные сущности не входят в начальный BRep MVP. Для связанных групп кривых BRep-поверхностей поддержана дискретная проверка формы под одной общей трансформацией. Для одиночной кривой грани остаются простые числовые сравнения; точное аналитическое распознавание произвольных NURBS не заявляется.
+Mesh, T-Spline, and sketch entities are outside the initial BRep MVP. For connected groups of curved BRep faces, a discrete shape check under one shared transformation is supported. Individual curved faces retain simple numerical comparisons; exact analytical recognition of arbitrary NURBS is not claimed.
 
-## Инженерные решения из опыта Perfora
+## Engineering decisions informed by Perfora
 
-Ядро получает только неизменяемые снимки; перестановка примеров не меняет результат. Fusion adapter сохраняет исходный контекст. Никакие атрибуты не записываются на рёбра и грани. Модель не перестраивается, временные CAD-тела не создаются.
+The kernel receives immutable snapshots only; reordering examples does not change the result. The Fusion adapter preserves the original context. No attributes are written to edges or faces. The model is not rebuilt and temporary CAD bodies are not created.
 
-Сначала дешёвые аналитические признаки. Уточнение топологии и кривизны добавляется только там, где снижает ложные совпадения. Лимиты прототипа: до 10 000 сущностей тела и мягкий бюджет чтения 2 секунды. Проверка бюджета между API-вызовами не может прервать один долгий вызов; это защита от продолжения обхода, не гарантия задержки интерфейса. Массовая подсветка требует отдельного измерения.
+Use inexpensive analytical features first. Add topology and curvature refinement only where it reduces false matches. Prototype limits: up to 10,000 body entities and a soft two-second reading budget. Checking the budget between API calls cannot interrupt one long call; it prevents traversal from continuing, but does not guarantee UI latency. Large-scale highlighting needs separate measurement.
 
-Первую модель намерения реализуем локально и детерминированно. LLM для сравнения BRep не нужен. Адаптацию к привычкам пользователя можно исследовать позже на основе явных исправлений, не подменяя ей геометрические проверки.
+Implement the first intent model locally and deterministically. An LLM is not needed to compare BRep. Adaptation to user habits may be studied later using explicit corrections, without substituting it for geometric checks.
 
-## Замкнутые цепочки
+## Closed chains
 
-Select Chain отделяет топологическую операцию от сходства. Один или несколько примеров запускают поиск ближайшего замкнутого контура через них; Chain across contact по умолчанию допускает переход через полный точный стык тел, а PgUp/PgDown и =/- переключают отдельные варианты контуров, заменяя предыдущий. Рёбра и грани имеют отдельную семантику, описанную в UX. Тела, геометрия и таймлайн не меняются.
+Select Chain separates topology from similarity. One or more examples start a search for the nearest closed contour passing through them. Chain across contact is enabled by default and permits transitions across a full exact body contact. PgUp/PgDown and =/- switch individual contour options, replacing the previous one. Edges and faces have separate semantics described in UX. Bodies, geometry and the timeline do not change.
 
-Уточнение Select Chain: каждый контур на каждом уровне проходит через все выбранные примеры. PgUp/PgDown и =/- переключают допустимые обходы через них без накопления. Поиск соседних отверстий, удалённых контуров или графовое расширение в Select Chain не входят. Плоскость влияет только на порядок уже допустимых контуров.
+Select Chain clarification: every contour at every level passes through all selected examples. PgUp/PgDown and =/- switch valid traversals through them without accumulation. Searching neighboring holes, remote contours, or graph expansion are not part of Select Chain. Plane affects only the ordering of already valid contours.
 
-Сквозной поиск сохраняет исходные контуры отдельных тел и добавляет контуры через точный стык. Временное удаление шва при Boolean Union не означает, что контуры по исходной линии разреза исчезают из выбора. Это относится и к рёбрам, и к цепочкам стенок.
+Cross-contact search preserves original contours of individual bodies and adds contours across exact contact. Temporary seam removal during Boolean Union does not mean contours along the original split line disappear from the selection. This applies to edges and wall chains alike.
 
-Для рёбер каталог включает также границы промежуточных связных частей плавного участка. Внутренний шов полного участка может оставаться границей его части и входить в искомый контур. Эти дополнительные варианты следуют после прежних контуров в том же классе плоскости; каждый всё равно обязан содержать все примеры. Перебор ограничен бюджетом топологии и времени, превышение явно отменяет результат.
+For edges, the catalog also includes boundaries of intermediate connected parts of a smooth region. An interior seam of the complete region can remain a boundary of one of its parts and belong to a requested contour. These additional options follow earlier contours in the same plane class; each must still contain every example. Enumeration is bounded by topology and time budgets; exceeding a budget explicitly cancels the result.
 
-Для граней дополнительно распознаются замкнутые полосы одного тела с двумя простыми границами и циклом поперечных стыков. Узкая полоса имеет приоритет; ширина относительно длины границы — эвристика порядка, не доказательство намерения. Ранее доступные обходы остаются вариантами. Полосы через стык нескольких тел этой проверкой пока не строятся.
+For faces, closed strips of one body with two simple boundaries and a cycle of cross seams are also recognized. A narrow strip takes priority; width relative to boundary length is an ordering heuristic, not proof of intent. Previously available traversals remain options. This check does not yet construct strips across the contact of multiple bodies.

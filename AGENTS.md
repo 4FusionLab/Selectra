@@ -1,44 +1,46 @@
 # Selectra
 
-Selectra упрощает выделение BRep-рёбер и граней в Autodesk Fusion по примерам.
+[Русская версия](AGENTS.ru.md)
 
-## Работа
+Selectra simplifies selecting Autodesk Fusion BRep edges and faces by example.
 
-- Общение, документация и планы, включая режим планирования, — на русском. Подписи интерфейса — на английском, в терминах Fusion.
-- Для вопросов о библиотеках, SDK, API, CLI и облачных сервисах используй Context7: сначала resolve-library-id, затем query-docs по конкретному вопросу. При неполном покрытии Fusion сверяй официальные документы Autodesk и определения установленного API.
-- Перед изменениями проверяй Git и сохраняй чужие изменения. Ветки — `codex/…`.
-- Область задаёт Search Scope: This Body — исходное тело выбранного экземпляра; This Component — компонент первого примера и его вложенная иерархия, по умолчанию; All Components — вся видимая сборка. В This Component соседние экземпляры того же определения исключены. Примеры и исключения доступны в выбранной области; сужение за пределы явных примеров отклоняется до их удаления пользователем.
-- Веб-демо не создавать. Проверки ядра выполнять в Python, интерфейс проверять в самом Fusion после разрешения пользователя.
-- PgUp/PgDown и алиасы =/- изменяют ранжированный диапазон сущностей выбранного типа в текущей области. Колесо остаётся навигации Fusion; графовое соседство — отдельная операция.
-- Результат до OK показывай стабильной Magenta-подсветкой. Отдельного поля Preview нет. Канонический сценарий — `docs/UX.md`.
-- Для браузера предпочитай подключённый DevTools или конкретную вкладку и узкие запросы. Computer Use применяй для нативного UI, визуальных проверок и недоступных элементов. Проверяй фактическое подключение; запуск удалённой отладки и перезапуск браузера согласовывай отдельно.
+## Work
 
-## Архитектура и продукт
+- Communicate and plan, including in plan mode, in Russian. Write documents in English and maintain separate Russian versions of documentation; intermediate working notes do not require translation. UI labels are English, using Fusion terminology.
+- For questions about libraries, SDKs, APIs, CLI tools and cloud services use Context7: first resolve-library-id, then query-docs for the specific question. If Fusion coverage is incomplete, check official Autodesk documentation and installed API definitions.
+- Check Git before changes and preserve others' work. Branches use `codex/…`.
+- Search Scope defines the area: This Body is the source body of the selected instance; This Component is the first example's component and nested hierarchy, by default; All Components is the entire visible assembly. This Component excludes neighboring instances of the same definition. Examples and exclusions are available within the chosen scope; narrowing past explicit examples is rejected until the user removes them.
+- Do not create a web demo. Test the core in Python and validate the interface in Fusion after user authorization.
+- PgUp/PgDown and aliases =/- change the ranked range of entities of the selected type in the current scope. The wheel remains Fusion navigation; graph adjacency is a separate operation.
+- Before OK, display the result with stable Magenta highlighting. There is no separate Preview field. The canonical workflow is `docs/UX.md`.
+- For the browser prefer connected DevTools or a specific tab and narrow requests. Use Computer Use for native UI, visual checks and unavailable elements. Verify actual connectivity; coordinate remote-debugging activation and browser restart separately.
 
-- `Selectra/matching.py` — чистое детерминированное ядро на числовых снимках, без `adsk`. Единицы: cm, cm², rad.
-- `ranking.py`, `snapshot.py`, `selection.py` — общее ранжирование, снимок тела и состояние диапазона/уточнений; устройство алгоритма — `docs/RANKING.md`.
-- `highlight.py` — временное Magenta-наложение в executePreview; валидная графика переиспользуется, группы очищаются при завершении команды.
-- `Selectra/fusion_adapter.py` — чтение BRep и проверка области; ссылки на живые объекты принадлежат одной сессии команды.
-- `Selectra/Selectra.py` — нативная команда, предпросмотр и жизненный цикл событий. Дополнение меняет выделение, сохраняя геометрию и таймлайн.
-- Вход по умолчанию — один `Select Similar`. Критерии выводятся из примеров; уточнения показываются по необходимости. Ранжирование — эвристика, не вероятность намерения пользователя.
-- Для изменения UX и алгоритма прочитай `docs/PRODUCT.md`; возможности API и ограничения — в `docs/API_RESEARCH.md`; очередность и критерии готовности — в `PLAN.md`.
-- Adapter сохраняет proxy/assemblyContext и различает экземпляры, числовые снимки и временная графика приведены к мировым координатам. tempId получает пространство имён тела при объединении; топология и пары стенок остаются внутри тела. Проверяй ревизии всех тел области и преобразования occurrences перед preview и отложенным OK.
-- Используй стандартную библиотеку Python, поставляемую Fusion. Preview API не используй в распространяемом продукте.
+## Architecture and product
 
-## Проверка
+- `Selectra/matching.py` is the pure deterministic kernel on numeric snapshots, without `adsk`. Units: cm, cm², rad.
+- `ranking.py`, `snapshot.py`, `selection.py` provide shared ranking, body snapshot and range/refinement state; algorithm details are in `docs/RANKING.md`.
+- `highlight.py` provides the temporary Magenta overlay in executePreview; valid graphics are reused and groups are cleared when the command ends.
+- `Selectra/fusion_adapter.py` reads BRep and checks scope; references to live objects belong to one command session.
+- `Selectra/Selectra.py` implements the native command, preview and event lifecycle. The add-in changes selection while preserving geometry and timeline.
+- The default entry point is one `Select Similar`. Criteria are inferred from examples; refinements are shown when needed. Ranking is a heuristic, not a probability of user intent.
+- For UX and algorithm changes read `docs/PRODUCT.md`; API capabilities and limitations are in `docs/API_RESEARCH.md`; sequencing and completion criteria are in `PLAN.md`.
+- The adapter preserves proxy/assemblyContext and distinguishes instances; numeric snapshots and temporary graphics are converted to world coordinates. tempId is namespaced by body when combining; topology and wall pairs remain inside the body. Check revisions of all bodies in scope and occurrence transforms before preview and delayed OK.
+- Use the Python standard library supplied with Fusion. Do not use Preview API in the distributed product.
 
-- Проверяй ядро: `python3 -m unittest discover -s tests -v`.
-- Для публичной обвязки дополнительно выполняй `python3 scripts/check_project.py` и `python3 scripts/build.py`. Сохраняй PolyForm Noncommercial 1.0.0 и соответствующие SPDX-заголовки. Перед релизом прочитай `docs/PUBLISHING.md`.
-- Для UI и adapter нужны проверки в настоящем Fusion по `docs/VALIDATION.md`. Выполняй их одной CAD-сессией на отдельном несохранённом документе; активный документ пользователя сохраняй нетронутым.
-- Отличай unit-тесты и проверку API definitions от живой CAD-приёмки. Точный выполненный объём смотри в `docs/VALIDATION.md`; результаты macOS не подтверждают Windows.
-- При завершении команды проверяй документ, текущую команду и валидность объектов перед отложенным переносом выбора. Храни event handlers до завершения сессии, освобождай при stop.
+## Verification
 
-## Общий инженерный контракт 4FusionLab
+- Test the core: `python3 -m unittest discover -s tests -v`.
+- For public packaging also run `python3 scripts/check_project.py` and `python3 scripts/build.py`. Preserve PolyForm Noncommercial 1.0.0 and the corresponding SPDX headers. Before release read `docs/PUBLISHING.md`.
+- UI and adapter require real Fusion tests according to `docs/VALIDATION.md`. Use one CAD session and a separate unsaved document; leave the user's active document untouched.
+- Distinguish unit tests and API definition checks from live CAD acceptance. See `docs/VALIDATION.md` for exact coverage; macOS results do not establish Windows behavior.
+- On command completion check document, current command and object validity before delayed transfer of selection. Retain event handlers until session end and release them on stop.
 
-- Корпоративные правила и общие CI-компоненты описаны в [4FusionLab/.github](https://github.com/4FusionLab/.github/blob/main/AGENTS.md) и [Release Platform](https://github.com/4FusionLab/.github/blob/main/RELEASE_PLATFORM.md). Настоящие правила конкретного продукта действуют дополнительно.
-- Перед правками проверь существующие Git-изменения, документацию, автоматические проверки и совместимость с Autodesk Fusion. Не удаляй пользовательские данные, не меняй существующие IDs команд, UUID manifest или структуру аддона без миграционного плана.
-- Для обычной разработки используй Conventional Commits; предпочтителен небольшой PR с CI, но прямой push в `main` допускается политикой репозитория. Не переписывай историю и не изменяй опубликованные теги/артефакты.
-- Включён **автоматический выпуск только при изменении распространяемого продукта**: push или merge в `main` → проверка `.github/release-paths.txt` → тесты → GitVersion 6.8.2 → новый неизменяемый тег и GitHub Release. Теги вручную не создавай; изменения README, документации, тестов, workflow, `AGENTS.md` не должны публиковать релиз.
-- Общие GitHub Actions подключай только по **точному SHA** проверенного коммита `4FusionLab/.github`, а не по `@main`. Пакет, manifest, SHA-256, release notes и version согласованы; существующие релизы не перезаписывай.
-- Выполнение unit-тестов и успешная сборка ZIP **не доказывают** работоспособность в установленном Autodesk Fusion. Для изменений Fusion API и пользовательского интерфейса фиксируй фактическую CAD-приёмку и ОС отдельно.
-- Сохраняй существующие английскую и русскую версии документации, лицензии, ограничения и уникальные сценарии проекта. Не публикуй секреты, персональные CAD-документы, токены или артефакты с локальной машины.
+## Shared 4FusionLab engineering contract
+
+- Organization rules and shared CI components are documented in [4FusionLab/.github](https://github.com/4FusionLab/.github/blob/main/AGENTS.md) and [Release Platform](https://github.com/4FusionLab/.github/blob/main/RELEASE_PLATFORM.md). These product-specific rules apply in addition.
+- Before edits inspect existing Git changes, documentation, automated checks and Autodesk Fusion compatibility. Do not delete user data or change existing command IDs, manifest UUID or add-in structure without a migration plan.
+- Use Conventional Commits for ordinary development; a small PR with CI is preferred, though direct push to `main` is allowed by repository policy. Do not rewrite history or modify published tags/artifacts.
+- **Automatic releases occur only for shipped product changes**: push or merge to `main` → check `.github/release-paths.txt` → tests → GitVersion 6.8.2 → new immutable tag and GitHub Release. Do not create tags manually; changes to README, documentation, tests, workflows or `AGENTS.md` must not independently publish a release.
+- Pin shared GitHub Actions to the **exact SHA** of a reviewed `4FusionLab/.github` commit, not `@main`. Package, manifest, SHA-256, release notes and version must agree; do not overwrite existing releases.
+- Passing unit tests and building a ZIP **does not prove** operation in installed Autodesk Fusion. Record actual CAD acceptance and OS separately for Fusion API and UI changes.
+- Preserve existing English and Russian documentation, licenses, limitations and project-specific workflows. Do not publish secrets, personal CAD documents, tokens or local-machine artifacts.

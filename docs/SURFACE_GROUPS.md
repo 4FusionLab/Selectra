@@ -1,11 +1,13 @@
-# Логические поверхности из фрагментов
+# Logical surfaces from fragments
 
-`surface_groups.py` — исполняемое офлайн-исследование объединения планарных полигональных фрагментов. Оно пока не подключено к нативному выбору: реальная STEP-приёмка и политика выбора целой логической поверхности остаются отдельным этапом.
+[Русская версия](SURFACE_GROUPS.ru.md)
 
-Вход — `BodySnapshot` одного тела. Группировка требует графовой связи исходных граней, совпадения опорных плоскостей в абсолютном допуске и подтверждённого общего отрезка границы. Внутренние общие сегменты удаляются; коллинеарные подразделения и T-соединения предварительно разбиваются. Результат хранит внешний контур, отверстия и все `source_keys`: ссылки на исходные BRep-грани не заменяются синтетическим ключом.
+`surface_groups.py` is an executable offline investigation of joining planar polygonal fragments. It is not yet connected to native selection: real STEP acceptance and the policy for selecting a complete logical surface remain separate work.
 
-Относительный допуск похожести 1% не используется для склеивания щелей. Неоднозначное соединение, пересечение внутренних областей, ветвление или неподдержанная грань сохраняются в `rejected` вместе с исходными ключами. При превышении бюджета `complete=False`, получение полного выбора запрещено.
+The input is a `BodySnapshot` of one body. Grouping requires graph connectivity of the source faces, coincident support planes within absolute tolerance, and a confirmed shared boundary segment. Internal shared segments are removed; collinear subdivisions and T-junctions are split first. The result retains the outer contour, holes, and all `source_keys`: references to original BRep faces are not replaced with a synthetic key.
 
-Проверены синтетические прямоугольные фрагменты, подразделённая граница, рамка с отверстием, заполнение отверстия, разные плоскости, нормали противоположных направлений, жёсткое преобразование, перекрытие, самопересечение, точечное касание и бюджеты. Команда: `python3 -m unittest tests.test_surface_groups -v`.
+The 1% relative similarity tolerance is not used to bridge gaps. Ambiguous joins, interior overlap, branching, or unsupported faces are retained in `rejected` with their source keys. If the budget is exceeded, `complete=False` and obtaining a complete selection is prohibited.
 
-Это не общий boolean произвольных NURBS-поверхностей. Тесселяция разных криволинейных границ, реальные STEP-импорты и перенос выбора объединённого участка в Fusion здесь не подтверждены. Автоматическое объединение в продукте пока выключено.
+Synthetic rectangular fragments, a subdivided boundary, a frame with a hole, filling a hole, different planes, opposite normals, a rigid transform, overlap, self-intersection, point contact, and budgets have been checked. Command: `python3 -m unittest tests.test_surface_groups -v`.
+
+This is not a general Boolean for arbitrary NURBS surfaces. Tessellation of different curved boundaries, real STEP imports, and transferring selection of a merged region into Fusion are not established here. Automatic merging in the product is currently disabled.

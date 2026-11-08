@@ -1,85 +1,87 @@
-# Selectra: продуктовый сценарий
+# Selectra: product workflow
 
-## Обещание
+[Русская версия](UX.ru.md)
 
-Покажи пример — получи похожие элементы в выбранной области. По умолчанию это компонент примера вместе с вложенной иерархией. Инструмент начинает с разумного предложения и даёт уточнить его по результату, не заставляя сначала выбирать технический критерий.
+## Promise
 
-Ориентир — скорость выделения Blender. Особенности Selectra: аналитическая CAD-геометрия, автоматический подбор общих признаков, обучение по дополнительным примерам и исключениям, ранжированный диапазон. Целевая модель геометрических отношений и намерений — [INTENT_MODEL.md](INTENT_MODEL.md); ниже описан интерфейс и текущее поведение.
+Show an example and obtain similar elements in the selected scope. By default, this is the example's component and nested hierarchy. The tool starts with a reasonable proposal and lets the user refine the result without first choosing a technical criterion.
 
-## Основной путь
+The speed of Blender selection is a reference point. Selectra's distinguishing features are analytical CAD geometry, automatic selection of shared features, learning from additional examples and exclusions, and a ranked range. The target model of geometric relationships and intent is in [INTENT_MODEL.md](INTENT_MODEL.md); this document describes the interface and current behavior.
 
-1. Пользователь выбирает ребро или грань и нажимает **ПКМ → Select Similar**. Уже выбранные элементы становятся примерами. Тип сущностей фиксирован; область по умолчанию — **This Component**.
-2. Сразу видит **Magenta-подсветку** предложенного набора: примеры и первую непустую группу совпадений. Непрозрачность заливки 35%, чтобы видеть перекрывающиеся плоскости. Это временное представление; реальное выделение результата ещё не применяется. Поля Preview и переключателя Wheel нет.
-3. Обычно достаточно **OK**. Пользователь получает обычное выделение Fusion и запускает нужную штатную операцию.
-4. Если набор слишком узкий или широкий, **PgUp / =** добавляет следующий уровень сходства, **PgDown / -** убирает самый слабый включённый уровень. Ползунок Similarity делает то же самое. Колесо сохраняет штатную навигацию Fusion.
-5. Если инструмент выбрал неправильный смысл сходства, пользователь добавляет второй пример в **Examples**. Чтобы показать лишний элемент, использует **Exclude** рядом. Это пересчитывает ранжирование и возвращает автоматический диапазон.
-6. **Cancel / Esc** удаляет временную подсветку и возвращает исходный выбор. Запуск другой команды не считается нажатием OK.
+## Main path
 
-## Компактный нативный диалог
+1. The user selects an edge or face and chooses **right-click → Select Similar**. Already selected elements become examples. Entity type is fixed; the default scope is **This Component**.
+2. The proposed set immediately receives **Magenta highlighting**: examples and the first nonempty group of matches. Fill opacity is 35% to reveal overlapping planes. This is temporary; the actual result selection has not yet been applied. There is no Preview field or Wheel toggle.
+3. Usually **OK** is sufficient. The user receives an ordinary Fusion selection and starts the desired native operation.
+4. If the set is too narrow or broad, **PgUp / =** adds the next similarity level and **PgDown / -** removes the weakest included level. The Similarity slider does the same. The mouse wheel retains normal Fusion navigation.
+5. If the tool chose the wrong meaning of similarity, the user adds a second example in **Examples**. To identify an unwanted element, use adjacent **Exclude**. This recalculates the ranking and restores the automatic range.
+6. **Cancel / Esc** removes temporary highlighting and restores the original selection. Starting another command is not treated as pressing OK.
 
-В основной части: количество результата и область, **Search Scope**, Examples и Exclude, ползунок **Similarity** с подписями **Closest / Broader**, подсказка **PgUp / =: more | PgDown / -: fewer**, OK и Cancel.
+## Compact native dialog
 
-**This Body** ограничивается телом выбранного примера в конкретном экземпляре. **This Component** включает тела выбранного компонента и всех его вложенных компонентов в этом экземпляре. Соседние экземпляры того же определения сюда не входят. Для тела корневого компонента его иерархия — вся сборка. **All Components** охватывает видимые доступные BRep-тела всей сборки, включая вложенные экземпляры.
+The main area shows result count and scope, **Search Scope**, Examples and Exclude, the **Similarity** slider labeled **Closest / Broader**, the hint **PgUp / =: more | PgDown / -: fewer**, OK, and Cancel.
 
-Смена области пересчитывает снимок и возвращает автоматический диапазон. Примеры можно добавлять из любого тела выбранной области. Если сужение оставляет явные примеры за её границей, пользователь сначала удаляет их; область не меняется незаметно. Исключения за пределами суженной области снимаются из Exclude. Текущая область всегда указана в статусе. При отказе расширения прежняя область сохраняется с сообщением; частичный набор из новой области не применяется.
+**This Body** is limited to the example's body in its particular instance. **This Component** includes bodies in the selected component and all nested components of that instance. Neighboring instances of the same definition are excluded. For a root-component body, its hierarchy is the entire assembly. **All Components** covers visible accessible BRep bodies throughout the assembly, including nested instances.
 
-**Refine** свёрнут. Внутри необязательный **Match** (Automatic либо конкретный признак), **Reset Range**. Технические признаки остаются доступны для воспроизводимости, но автоматический режим выбран по умолчанию. Большая палитра настроек, проценты «уверенности» и обязательный выбор критерия не нужны.
+Changing scope rebuilds the snapshot and restores the automatic range. Examples can be added from any body in the selected scope. If narrowing would leave explicit examples outside it, the user removes them first; scope does not change silently. Exclusions outside the narrowed scope are removed from Exclude. Current scope is always shown in status. If expansion fails, the previous scope remains with a message; a partial set from the new scope is not applied.
 
-Пользователь видит результат на модели, а не список tempId. Число включённых элементов обновляется вместе с подсветкой. Смена примеров не создаёт геометрию и не меняет таймлайн.
+**Refine** is collapsed. It contains optional **Match** (Automatic or a specific feature) and **Reset Range**. Technical features remain available for reproducibility, but automatic mode is the default. A large settings palette, confidence percentages, and mandatory criterion selection are unnecessary.
 
-## Ранжирование и управление диапазоном
+The user sees the result on the model, not a list of tempIds. The included-element count updates with highlighting. Changing examples does not create geometry or modify the timeline.
 
-Все сущности выбранного типа текущей области получают расстояние сходства. Отношения соседства и материала проверяются внутри каждого тела; совпадения формы допускаются между телами. Это геометрический порядок, не вероятность намерения.
+## Ranking and range control
 
-В автоматическом режиме используются доступные признаки: тип геометрии, длина/площадь, радиус, направление/ось нормали, периметр, простая сигнатура границы. Внутренняя сторона тонкой стенки не считается менее похожей только из-за разворота нормали на 180°. Ориентация слабее размера и формы; точное направление доступно через Match → Orientation. Если два примера различаются по признаку сильнее допуска, он перестаёт быть обязательным общим свойством. Исключения усиливают признаки, которые отделяют их от примеров.
+All entities of the selected type in the current scope receive a similarity distance. Adjacency and material relationships are checked within each body; shape matches may cross bodies. This is a geometric order, not an intent probability.
 
-Исходные примеры сохраняются при любом диапазоне; исключения не включаются даже при максимальном расширении. Равно похожие элементы добавляются и убираются вместе: порядок идентификаторов не должен произвольно разрывать такую группу. Поэтому один шаг PgUp может добавить несколько элементов.
+Automatic mode uses available features: geometry type, length/area, radius, direction/normal axis, perimeter, and a simple boundary signature. The inner side of a thin wall is not considered less similar solely because its normal is reversed by 180°. Orientation is weaker than size and shape; exact direction is available through Match → Orientation. If two examples differ on a feature beyond tolerance, it ceases to be a mandatory shared property. Exclusions strengthen features that distinguish them from examples.
 
-Диапазоны вложены: расширение сохраняет уже включённое; сужение удаляет наименее похожее. До максимума можно дойти до всех допустимых элементов этого типа в теле. Это не поиск соседей и не изменение геометрии. Графовые More/Less, Linked и поиск путей — отдельные операции; PgUp/PgDown к ним не привязаны.
+Original examples remain at every range; exclusions are not included even at maximum expansion. Equally similar elements are added and removed together: identifier order must not arbitrarily split the group. One PgUp step can therefore add several elements.
 
-Начальный автоматический диапазон сразу включает первую доступную группу похожих элементов сверх примеров; Reset Range возвращает её. Если кандидатов нет либо общих признаков недостаточно, инструмент сохраняет примеры и просит уточнить. Если исключение геометрически неотличимо от примера, это сообщается; произвольное различие не выдаётся за распознанное намерение.
+Ranges are nested: expanding keeps included elements; narrowing removes the least similar. At maximum, all permitted elements of that type in the body can be reached. This is not a neighbor search or geometry modification. Graph More/Less, Linked, and path search are separate operations; PgUp/PgDown are not bound to them.
 
-## Поведение подсветки
+The initial automatic range immediately includes the first available group of similar elements beyond the examples; Reset Range restores it. If no candidates exist or shared features are insufficient, the tool retains examples and asks for refinement. If an exclusion is geometrically indistinguishable from an example, this is reported; an arbitrary distinction is not presented as recognized intent.
 
-Последний включённый уровень дополнительно обведён контуром 3 px. При расширении акцент переходит на добавленную группу, при сужении — на внешний оставшийся уровень. Контур не мигает; предыдущие грани сохраняют заливку 35%, рёбра — Magenta-контур 1.5 px. Короткий статус различает подтверждённую форму, сторону стенки, повтор группы и приближённое сходство. Максимум явно подписан как все разрешённые элементы исходного типа тела.
+## Highlighting behavior
 
-Magenta-подсветка должна оставаться на месте при остановленном вводе, движении курсора, смене параметров и вращении вида. Временные объекты не перехватывают выбор мышью.
+The last included level receives an additional 3 px outline. When expanding, the emphasis moves to the added group; when narrowing, it moves to the outermost remaining level. The outline does not blink; earlier faces retain a 35% fill and edges a 1.5 px Magenta outline. Short status text distinguishes a verified shape, wall side, repeated group, and approximate similarity. The maximum is explicitly labeled as all permitted elements of the body's original type.
 
-Для совпадающих поверхностей используется эффект наложения и приоритет глубины. Координаты реальной грани не смещаются. Графика создаётся в штатном событии preview команды; валидная группа переиспользуется, элементы скрываются/показываются без очистки всего кадра. OK/Cancel/Stop удаляют группу целиком.
+Magenta highlighting must remain in place when input stops, the cursor moves, parameters change, and the view rotates. Temporary objects do not intercept mouse selection.
 
-Отдельно проверяются исчезновение графики из-за жизненного цикла preview и конфликт глубины на совпадающих поверхностях. Стабильность не считается доказанной только по наличию созданных CustomGraphics-объектов — нужна визуальная проверка в Fusion.
+Overlapping surfaces use an overlay effect and depth priority. Real face coordinates are not displaced. Graphics are created in the command's native preview event; a valid group is reused, and elements are hidden/shown without clearing the entire frame. OK/Cancel/Stop removes the complete group.
 
-## Критерии готовности опыта
+Disappearance caused by the preview lifecycle and depth conflicts on overlapping surfaces are checked separately. Stability is not established merely by created CustomGraphics objects: visual validation in Fusion is required.
 
-- С одним примером можно получить предложение и подтвердить его без посещения Refine.
-- PgUp/PgDown и ползунок управляют одним ранжированием; соседство не влияет на порядок похожести.
-- Подсветка непрерывна, Magenta, совпадает с набором после OK и не становится настоящим выделением до подтверждения.
-- Дополнительный пример и исключение меняют смысл поиска предсказуемо; Reset Range возвращает автоматический диапазон.
-- Cancel и прерывание сохраняют модель и не оставляют временной графики.
-- Неизвестные признаки, бюджет отображения или изменение тела приводят к понятному сообщению без частичного применения.
+## Experience acceptance criteria
 
-Документ фиксирует целевое поведение и контракт ядра. Фактическая CAD-приёмка записывается отдельно в [VALIDATION.md](VALIDATION.md).
+- One example can produce a proposal and be confirmed without visiting Refine.
+- PgUp/PgDown and the slider control one ranking; adjacency does not determine similarity order.
+- Highlighting is continuous and Magenta, matches the set after OK, and does not become actual selection before confirmation.
+- An additional example and exclusion change search meaning predictably; Reset Range restores the automatic range.
+- Cancel and interruption preserve the model and leave no temporary graphics.
+- Unknown features, display-budget exhaustion, or a changed body produce a clear message without partial application.
 
-Для одинаковой геометрической группы Automatic предлагает сначала элементы в плоскости примера, затем отдельным шагом — в параллельных плоскостях, затем — в остальных. Например, кромки отверстий на внешней стороне пластины идут до внутренних кромок на обратной стороне. Статус показывает In the example plane / In parallel planes / In other planes; отсутствие опорной плоскости обозначается Support plane unavailable.
+This document records target behavior and the kernel contract. Actual CAD acceptance is recorded separately in [VALIDATION.md](VALIDATION.md).
 
-Несколько несвязанных плоских Examples могут задавать разные размерные семейства. Automatic сначала показывает подтверждённые аналоги каждого примера с пояснением Matching shapes and sizes of the examples. Связанные примеры могут задавать повтор всей группы; общая плоскость сама по себе не заменяет проверку формы.
+For the same geometric group, Automatic first proposes elements in the example plane, then in a separate step those in parallel planes, then others. For example, hole edges on a plate's outer side precede inner edges on the reverse side. Status shows In the example plane / In parallel planes / In other planes; an absent support plane is labeled Support plane unavailable.
 
-Выбранные внутренние стороны паза могут включать цилиндрические и NURBS-грани. Связанные части ищутся целыми группами: нельзя включить только одну случайную грань похожего размера. Для экструзионного паза сохраняется порядок уровней по его торцевой плоскости: та же → параллельные → остальные. Статус Matching curved-face groups (sampled geometry) указывает на дискретную проверку формы.
+Several disconnected planar Examples can define different size families. Automatic first shows verified analogues of each example with the explanation Matching shapes and sizes of the examples. Connected examples can define a repetition of the complete group; a shared plane alone does not replace shape checking.
+
+Selected inner sides of a slot may include cylindrical and NURBS faces. Connected parts are searched as complete groups: one arbitrary similarly sized face cannot be included alone. For an extruded slot, level order follows its end plane: same → parallel → others. Matching curved-face groups (sampled geometry) indicates a discrete shape check.
 
 ## Select Chain
 
-Отдельная команда контекстного меню для одного или нескольких выбранных BRep-рёбер либо граней стенки. Каждый предлагаемый контур на любом уровне должен проходить через все примеры. Ребро задаёт ближайшую замкнутую петлю рёбер; грань — замкнутый обход прилегающих стенок по петле соседней грани. Замкнутость берётся из BRep-топологии, а не из зрительного сходства. Для стенок проверяется непрерывность соседних участников обхода. Швы с повторным прохождением одного ребра не считаются простой петлёй рёбер.
+A separate context-menu command for one or more selected BRep edges or wall faces. Every proposed contour at every level must pass through all examples. An edge defines the nearest closed edge loop; a face defines a closed traversal of adjacent walls around a neighboring face loop. Closure comes from BRep topology, not visual resemblance. For walls, continuity of neighboring traversal members is checked. Seams that traverse one edge repeatedly are not simple edge loops.
 
-Галочка **Chain across contact** включена по умолчанию: цепочка может проходить через полностью совпадающие общие грани видимых тел, как после Split Body. Совпадение точки/ребра, частичное касание, зазор и объёмное перекрытие не считаются таким стыком. При выключенной галочке тела остаются раздельными. Все контуры должны проходить через все примеры. Среди таких контуров выше идут лежащие в плоскости примеров, затем параллельные, остальные и контуры с неопределённой плоскостью. Внутри этого порядка учитываются внутренняя петля и периметр. Переключение выбирает только альтернативные замкнутые обходы через те же примеры. Соседние отверстия и контуры, не содержащие выбранный элемент, не входят в поиск даже на максимуме. Разные контуры с равным рангом остаются отдельными вариантами. Это эвристика выбора ближайшего контура, а не единственное математически возможное понимание стенки.
+**Chain across contact** is enabled by default: a chain can cross completely coincident shared faces of visible bodies, as after Split Body. Point/edge coincidence, partial contact, a gap, and volume overlap do not count as such a junction. With the checkbox off, bodies remain separate. Every contour must pass through all examples. Among those, contours in the examples' plane rank first, then parallel, other, and undefined-plane contours. Within that order, inner loops and perimeter are considered. Switching selects only alternative closed traversals through the same examples. Neighboring holes and contours without the chosen element are excluded even at maximum. Different equally ranked contours remain separate options. This is a nearest-contour heuristic, not the only mathematically possible interpretation of a wall.
 
-Contour, PgUp и = выбирают следующий целый контур вместо предыдущего; PgDown и - возвращают предыдущий вариант. Одновременно показывается ровно один контур, накопления нет. Пример сохраняется. Подсветка Magenta, перенос выделения только по OK, Cancel восстанавливает исходный пример. Когда замкнутой цепочки нет, показано явное сообщение и OK недоступен. Examples позволяет добавлять примеры и убирать лишние; Search Scope, Match и Exclude здесь не показываются.
+Contour, PgUp, and = choose the next complete contour instead of the previous one; PgDown and - return to the previous option. Exactly one contour is displayed at a time, without accumulation. The example is retained. Highlighting is Magenta; selection transfers only on OK; Cancel restores the original example. If no closed chain exists, a clear message is shown and OK is disabled. Examples allows adding and removing examples; Search Scope, Match, and Exclude are not shown here.
 
-Переход через стык проверяется на временных BRep-копиях; реального Combine, Stitch или изменения таймлайна нет. Замкнутый контур строится после виртуального удаления внутренних швов и полностью сопоставляется исходным рёбрам/граням. Если примеры на раздельных телах при выключенной галочке не принадлежат одному контуру, они сохраняются, показано No closed contour passes through all examples, OK недоступен. Ползунок, PgUp/PgDown и =/- продолжают добавлять целые контуры.
+Cross-contact transitions are checked on temporary BRep copies; no real Combine, Stitch, or timeline modification occurs. A closed contour is constructed after virtual removal of internal seams and mapped completely back to original edges/faces. If examples on separate bodies do not belong to one contour with the checkbox off, they remain selected, No closed contour passes through all examples is displayed, and OK is disabled. The slider, PgUp/PgDown, and =/- continue adding whole contours.
 
-Для ребра плоскость определяется по его известным опорным плоскостям; для нескольких примеров берутся общие плоскости. У прямого ребра их может быть несколько. Если плоскость примера не определена (например, для стенки), используется плоскость ближайшего подходящего замкнутого контура. На любом шаге добавляется целая петля через все примеры. Совпадение плоскости и геометрическое соседство не заменяют это обязательное условие. Статус показывает In the example plane / In parallel planes / In other planes / Contour plane unavailable.
+For an edge, plane is determined from its known support planes; for multiple examples, common planes are used. A straight edge can have several. If the example plane is undefined (for example, for a wall), the plane of the nearest suitable closed contour is used. Every step adds a whole loop through all examples. Plane coincidence and geometric adjacency do not replace this mandatory condition. Status shows In the example plane / In parallel planes / In other planes / Contour plane unavailable.
 
-Chain across contact добавляет сквозные варианты к контурам исходных тел. Она не заменяет каталог исходных тел временно объединённой геометрией: контуры по границе Split Body остаются доступными, даже если виртуальное объединение удаляет этот шов. Каждый вариант по-прежнему проходит через все примеры.
+Chain across contact adds cross-body options to the source bodies' contours. It does not replace the source-body catalog with temporarily united geometry: contours along the Split Body boundary remain available even if virtual union removes that seam. Every option still passes through all examples.
 
-Для рёбер доступны также общие границы групп плавно соединённых граней: например, обход трёх внутренних стенок половины паза целиком. Внутренние стыки этих стенок не входят в контур. Если у группы несколько отдельных замкнутых границ, каждая остаётся самостоятельным вариантом; в поиск попадают только проходящие через все примеры. Простое соседство или совпадение координат концов не считается доказательством замыкания.
+For edges, shared boundaries of smoothly connected face groups are also available: for example, the complete outline of three inner walls of half a slot. Internal junctions of those walls are not part of the contour. If a group has several separate closed boundaries, each remains an independent option; only those through all examples enter the search. Simple adjacency or coincident endpoint coordinates do not prove closure.
 
-Для граней поиск также распознаёт замкнутую полосу из нескольких смежных граней одного тела, если у неё две полные простые границы и простой цикл поперечных стыков. Узкие полосы ранжируются перед обходами соседних граней; их порядок зависит от отношения средней длины стыка к длине меньшей границы. Это эвристика: для широкой или сложной полосы порядок может отличаться от ожидаемого. Поиск ограничен бюджетом и не выдаёт частичный результат при его превышении. Сквозные полосы из нескольких тел пока не распознаются этой дополнительной проверкой.
+For faces, the search also recognizes a closed strip of several adjacent faces of one body when it has two complete simple boundaries and a simple cycle of cross junctions. Narrow strips rank before traversals of neighboring faces; their order depends on the ratio of mean junction length to the smaller boundary length. This is a heuristic: for a wide or complex strip the order can differ from expectations. Search is budget-limited and does not return a partial result when exceeded. This additional check does not yet recognize cross-body strips.
