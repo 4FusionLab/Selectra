@@ -1,223 +1,225 @@
-# Проверка Selectra внутри Fusion
+# Selectra validation in Fusion
 
-Статус 25.10.2026: **частичная нативная приёмка выполнена** в Autodesk Fusion 2706.1.14 на macOS. Сначала разработка шла полностью офлайн; после разрешения пользователя тесты выполнялись на его открытой модели. Полная матрица ниже остаётся протоколом для следующих проверок.
+English | [Русский](VALIDATION.ru.md)
 
-Локально после геометрической итерации: 134 Python-теста — OK; compileall, metadata/SPDX/ссылки и ZIP/SHA-256 — OK. Эти проверки не заменяют CAD-приёмку. Историческая базовая приёмка ниже выполнялась при 64 тестах.
+Status 10.25.2026: **partial native acceptance completed** in Autodesk Fusion 2706.1.14 on macOS. At first, development was completely offline; After the user's permission, tests were performed on his open model. The complete matrix below remains the protocol for the following checks.
 
-## Геометрическая итерация 25.10.2026
+Locally after geometric iteration: 134 Python tests - OK; compileall, metadata/SPDX/links and ZIP/SHA-256 - OK. These checks do not replace CAD acceptance. The historical baseline acceptance below was performed with 64 tests.
 
-### Исправление чтения внутренней грани
+## Geometric iteration 10/25/2026
 
-После пользовательского сообщения воспроизведён дефект на выбранной внутренней грани текущего тела: вместо её противоположного внутреннего аналога первой шла наружная сторона исходной стенки. Площадь и периметр внутреннего аналога совпадали, но контур читался неверно. Для части BRep-рёбер направление параметризации evaluator противоположно направлению самого ребра; учитывался только coedge.isOpposedToEdge, без edge.isParamReversed. Между последовательными участками ошибочной границы появлялись большие скачки.
+### Correcting internal face reading
 
-Обе ориентации теперь компонуются через XOR, непрерывность и замыкание проверяются до передачи контура в ядро. Протокольный тест `tests/test_fusion_contours.py` воспроизвёл сбой на синтетическом контуре со смешанной параметризацией и прошёл после исправления. На исходной выбранной грани после исправления первый уровень снова содержит только противоположный внутренний аналог с объяснением shape; наружная пара переместилась на следующий уровень. Пользовательская геометрия не включается в регрессионный корпус.
+After the user message, the defect on the selected internal face of the current body was reproduced: instead of its opposite internal analogue, the outer side of the original wall came first. The area and perimeter of the internal analogue were the same, but the contour was read incorrectly. For some BRep edges, the direction of the evaluator parameterization is opposite to the direction of the edge itself; Only coedge.isOpposedToEdge was taken into account, without edge.isParamReversed. Large jumps appeared between successive sections of the erroneous boundary.
 
-### Основная приёмка итерации
+Both orientations are now XORed, continuity and closure are checked before the outline is passed to the kernel. The `tests/test_fusion_contours.py` protocol test reproduced the failure on a synthetic circuit with mixed parameterization and passed after correction. On the original selected face, after correction, the first level again contains only the opposite internal analog with the shape explanation; the outer pair has moved to the next level. User geometry is not included in the regression corpus.
 
-Для исправления ориентации повторно проверен именно зарегистрированный перезагруженный add-in в открытом пользовательском документе: начальный набор — исходная внутренняя грань и её противоположный внутренний аналог. Временная графика совпала с набором; следующие уровни — непосредственная наружная пара и пара аналога. Геометрия, ревизия, площадь, объём и число граней/рёбер остались прежними. После исправления проходят 135 Python-тестов; синтетический корпус сохраняет результаты 11/11 и 5/6. Исправленный предпросмотр оставлен открытым для пользователя.
+### Basic iteration acceptance
 
-Fusion 2706.1.14, macOS, зарегистрированный add-in текущей рабочей ветки. Основной координатор работал последовательно; субагенты выполняли только офлайн-задачи.
+To correct the orientation, it is the registered reloaded add-in in the open user document that is re-checked: the initial set is the original internal face and its opposite internal analogue. The temporary graphics coincided with the set; the next levels are the direct outer pair and the analogue pair. Geometry, revision, area, volume and number of faces/edges remain the same. After the fix, 135 Python tests are passed; the synthetic corpus maintains results of 11/11 and 5/6. The corrected preview is left open to the user.
 
-В отдельном несохранённом документе создано замкнутое тонкостенное тело: 12 граней, 24 ребра, внешний размер 10×6×2 cm и внутренняя полость 9.6×5.6×1.6 cm. Второе идентичное тело исключено из области поиска. Воспроизводимая фикстура — `tests/fusion_geometric_acceptance.py`; она использует вычисленные тела BaseFeature после finishEdit, а не ссылки на edit bodies.
+Fusion 2706.1.14, macOS, registered add-in of the current working branch. The main coordinator worked consistently; subagents performed only offline tasks.
 
-- Полный снимок содержит 12 граней и 6 локальных пар стенок. Первые три группы: внешний аналог → внутренняя сторона стенки примера → внутренняя сторона аналога. Проверены точные сущности и их родительское тело.
-- PgUp: 2→3 грани, PgDown: 3→2. Последний уровень имеет отдельный контур; видимость и переиспользование графики проверены readback, заливка и контур просмотрены в UI. Непрозрачность обеих граней: API `(True, 0.349999994, True)`.
-- Два предвыбранных примера противоположных сторон задают wall_sides: выбраны ровно 4 грани двух соответствующих стенок. После настоящего OK activeSelections точно совпал с предпросмотром; graphics groups = 0.
-- Два связанных примера разных размеров задают repeated_region. Найдены ровно 4 внешние грани соответствующих узлов; начальный анализ около 1.4 ms, подсветка около 92 ms.
-- Настоящий Cancel восстановил исходный пример; graphics groups = 0. После всех проверок fingerprint геометрии/таймлайна тестового и исходного документов совпал. Созданный документ закрыт без сохранения, исходный активирован; пользовательские документы не сохранялись и не закрывались.
-- Отдельное тело 4×4×0.2 cm с узкой замкнутой полостью между глубинами проб показало ложность только пяти точечных проб. Проверка пересечений всей трассы отклонила эту пару; в снимке ложной связи нет.
-- На проверенном ядре ray proximityTolerance 1e-7 cm возвращал пустые коллекции; 1e-6 cm дал согласованные hitPoints и сущности. Используется 1e-6 cm с обязательным подтверждением достижения противоположной грани. Пустой/несогласованный результат не считается доказательством материала.
+In a separate unsaved document, a closed thin-walled body was created: 12 faces, 24 edges, external size 10 × 6 × 2 cm and internal cavity 9.6 × 5.6 × 1.6 cm. The second identical body is excluded from the search area. Reproducible fixture - `tests/fusion_geometric_acceptance.py`; it uses the calculated BaseFeature bodies after finishEdit, rather than references to edit bodies.
 
-Первый обычный запуск фикстуры: BRep 2.37 ms, топология 0.58 ms, отношения 1.77 ms; суммарное чтение 4.86 ms, анализ 0.48 ms, графика 70.16 ms. Это малая синтетическая деталь; масштабируемость отсюда не следует.
+- The full snapshot contains 12 faces and 6 local pairs of walls. The first three groups: external analogue → internal side of the example wall → internal side of the analogue. The exact entities and their parent body are verified.
+- PgUp: 2→3 faces, PgDown: 3→2. The last level has a separate circuit; Visibility and reuse of graphics are checked by readback, fill and outline are checked in the UI. Opacity of both faces: API `(True, 0.349999994, True)`.
+- Two preselected examples of opposite sides set wall_sides: exactly 4 faces of the two corresponding walls are selected. After this OK activeSelections exactly matched the preview; graphics groups = 0.
+- Two related examples of different sizes define repeated_region. Exactly 4 external faces of the corresponding nodes are found; initial analysis about 1.4 ms, highlighting about 92 ms.
+- This Cancel restored the original example; graphics groups = 0. After all the checks, the fingerprint of the geometry/timeline of the test and source documents matched. The created document is closed without saving, the original one is activated; User documents were not saved or closed.
+- A separate body 4×4×0.2 cm with a narrow closed cavity between the sample depths showed the falsehood of only five point samples. An intersection check of the entire route rejected this pair; There is no false connection in the picture.
+- On the tested core, ray proximityTolerance 1e-7 cm returned empty collections; 1e-6 cm gave consistent hitPoints and entities. 1e-6 cm is used with mandatory confirmation of reaching the opposite face. A blank/inconsistent result is not considered evidence of material.
 
-После финальной перезагрузки add-in выполнен дополнительный read-only smoke текущего исходника на открытой пользовательской модели: 39 граней, полный scope, 11 связей с локальным свидетельством материала, 6 диапазонов для выбранной плоской грани. BRep 17.73 ms, топология 4.54 ms, отношения 127.00 ms, суммарное чтение 149.67 ms, анализ 9.22 ms. Геометрия, ревизия, видимость и таймлайн до/после совпали. Правильность каждого из 11 отношений вручную в этом smoke не оценивалась; новый UI-предпросмотр на пользовательской детали не запускался.
+First normal fixture run: BRep 2.37 ms, topology 0.58 ms, relations 1.77 ms; total reading 4.86 ms, analysis 0.48 ms, graphics 70.16 ms. This is a small synthetic part; scalability does not follow from here.
 
-Exclude в живом диалоге в этой итерации не принят: попытка внешнего тестового обработчика не добавила элемент в CommandInput, поэтому не засчитана как проверка. Чистое ядро и ограничения исключений покрыты тестами. Вращение камеры, полная матрица прерываний, реальные STEP и Windows для новой реализации ещё требуются.
+After the final add-in reload, an additional read-only smoke of the current source was performed on the open user model: 39 faces, full scope, 11 connections with local material evidence, 6 ranges for the selected flat face. BRep 17.73 ms, topology 4.54 ms, relations 127.00 ms, total read 149.67 ms, analysis 9.22 ms. Geometry, revision, visibility and timeline before/after matched. The correctness of each of the 11 relationships in this smoke was not manually assessed; The new UI preview on the user part was not launched.
 
-## Выполнено в Fusion
+Exclude in the live dialog was not accepted in this iteration: the attempt by the external test handler did not add an element to the CommandInput, so it is not counted as a check. The pure core and exception restrictions are covered by tests. Camera rotation, a full interrupt matrix, real STEP and Windows are still required for the new implementation.
 
-- Штатно подключён add-in из текущего checkout, Run on Startup выключен. Временный импорт MCP не используется как доказательство UI.
-- В событии настоящего меню ПКМ подтверждено добавление Select Similar.
-- Один root body: 97 рёбер, 39 граней. Read-only контракт проверил по 8 примеров каждого типа: ранжирование полное, диапазоны вложены, максимум охватывает все допустимые сущности этого тела.
-- Рёбра: начальный ранжированный набор 4; PgUp дал 8; PgDown вернул 4. По реальному OK activeSelections точно совпал с зафиксированными ключами этих 4 рёбер.
-- Грани: начальный набор 2; PgUp дал 3; PgDown вернул 2. Magenta-наложение видно на реальных поверхностях, в том числе через перекрывающую геометрию.
-- После паузы графика оставалась видимой без нового кадра. После устранения двойного doExecutePreview на изменение диапазона приходится один обновлённый кадр.
-- На пользовательском примере тонкой стенки воспроизведён ошибочный порядок: поперечная внутренняя грань шла раньше параллельной из-за направленной нормали. Исправленный Automatic проверен на полном неизменённом снимке тела: внешняя похожая → параллельная внутренняя → поперечная внутренняя. Отдельный регрессионный тест сохраняет этот порядок, а явный Orientation — направленную семантику.
-- После перезагрузки текущего add-in на том же примере подтверждены стартовый уровень 1 с двумя гранями и порядок следующих групп. Нативный getOpacity вернул 0.35 с override для обеих графических граней; заливка визуально стала полупрозрачной. Значение хранится API с точностью float.
-- Cancel вернул исходную грань. После OK и Cancel customGraphicsGroups = 0.
-- В контрольной сессии сравнивались объём, площадь, число граней/рёбер, видимость, ревизии тел и таймлайн: изменений не было. Документ не сохранялся.
+## Completed in Fusion
 
-Офлайн-ядро дополнительно проверяет исключения, конфликт обратной связи, историю, одинаковые оценки, явные критерии, scope/revision и ограниченный поиск похожих регионов. Наличие этих тестов не означает, что все соответствующие UI-сценарии уже пройдены.
+- The add-in from the current checkout is normally connected, Run on Startup is disabled. Temporary MCP imports are not used as proof of UI.
+- Adding Select Similar has been confirmed in the current RMB menu event.
+- One root body: 97 edges, 39 faces. The Read-only contract checked 8 examples of each type: the ranking is complete, the ranges are nested, the maximum covers all valid entities of this body.
+- Edges: initial ranked set 4; PgUp gave 8; PgDown returned 4. In reality, OK activeSelections exactly matched the fixed keys of these 4 edges.
+- Edges: initial set 2; PgUp gave 3; PgDown returned 2. Magenta overlay is visible on real surfaces, including through overlapping geometry.
+- After a pause, the graphics remained visible without a new frame. After eliminating the double doExecutePreview, there is one updated frame per range change.
+- On a user example of a thin wall, an erroneous order was reproduced: the transverse internal face came before the parallel one due to the directed normal. The corrected Automatic is tested on a full unaltered body shot: external similar → parallel internal → transverse internal. A separate regression test preserves this order, and an explicit Orientation preserves directional semantics.
+- After reloading the current add-in using the same example, the starting level 1 with two faces and the order of the following groups were confirmed. Native getOpacity returned 0.35 with override for both graphic faces; the fill became visually translucent. The value is stored by the API with float precision.
+- Cancel returned the original face. After OK and Cancel customGraphicsGroups = 0.
+- In the control session, volume, area, number of faces/edges, visibility, body revisions and timeline were compared: there were no changes. The document was not saved.
 
-## Приёмка областей сборки и клавиш =/- — 25.10.2026
+The offline kernel additionally checks for exceptions, feedback conflict, history, equal scores, explicit criteria, scope/revision, and limited similar region searches. The presence of these tests does not mean that all relevant UI scenarios have already been passed.
 
-Внедрены This Body / This Component / All Components; начальный режим — This Component. Он включает тела выбранного экземпляра и его дочернюю иерархию. Для корневого компонента это вся сборка. Видимость и доступность для выбора учитываются при чтении.
+## Acceptance of assembly areas and keys =/- - 10.25.2026
 
-На отдельном несохранённом документе `tests/fusion_scope_acceptance.py` построены тела корневого компонента, два экземпляра одного определения и ещё один вложенный экземпляр; затем добавлен дочерний компонент выбранного определения. Проверены повороты вокруг разных осей и переносы.
+Implemented This Body / This Component / All Components; the initial mode is This Component. It includes the bodies of the selected instance and its child hierarchy. For the root component, this is the entire assembly. Visibility and selectability are taken into account when reading.
 
-| Режим | Тела / грани области | Первый набор |
+The bodies of the root component, two instances of one definition and another nested instance are built on a separate unsaved document `tests/fusion_scope_acceptance.py`; then the child component of the selected definition is added. Rotations around different axes and translations were tested.
+
+| Mode | Region bodies/faces | First set |
 | --- | --- | --- |
 | This Body | 1 / 6 | 2 |
-| This Component с дочерним компонентом | 3 / 18 | 6 |
+| This Component with child component | 3 / 18 | 6 |
 | All Components | 10 / 60 | 20 |
 
-Режимы переключались настоящим нативным списком. Все ключи уникальны, временная BRep-заливка совпала с мировыми boundingBox граней с ошибкой менее 1e-6 cm; контуры — менее 1e-5 cm (координаты графики float32). После OK activeSelections содержал ровно ожидаемые 20 исходных proxy-граней; graphics groups = 0. Cancel также очищал графику и восстанавливал исходный выбор.
+Modes were switched with a real native list. All keys are unique, the temporary BRep fill coincided with the world boundingBox faces with an error of less than 1e-6 cm; contours - less than 1e-5 cm (graphic coordinates float32). After OK, activeSelections contained exactly the expected 20 original proxy faces; graphics groups = 0. Cancel also cleared the graphics and restored the original selection.
 
-Клавиши =, -, PgUp, PgDown на одном и том же диапазоне дали соответственно 18, 6, 18, 6 граней, уровни 2, 1, 2, 1. Учитывается Shift, который текущая раскладка передавала вместе с =; Ctrl/Alt/Meta эти алиасы не перехватывают.
+The keys =, -, PgUp, PgDown on the same range gave respectively 18, 6, 18, 6 faces, levels 2, 1, 2, 1. Shift is taken into account, which the current layout transmitted along with =; Ctrl/Alt/Meta does not intercept these aliases.
 
-Отдельно проверены: скрытый экземпляр с дочерним компонентом не попал в All Components; изменение transform2 сделало прежний scope guard невалидным; This Component для корневого тела охватил всю сборку. На тонком теле внутри повёрнутого экземпляра нативная проверка материала подтвердила пару стенок. Два начальных примера из разных тел одного компонента корректно получили разные пространства ключей и общий результат.
+Separately checked: the hidden instance with a child component was not included in All Components; the change to transform2 made the previous scope guard invalid; This Component for the root body covered the entire assembly. On the thin body inside the rotated specimen, native material testing confirmed a pair of walls. Two initial examples from different bodies of the same component correctly obtained different key spaces and the overall result.
 
-Пользовательский проект, ранее отклонявшийся из-за assemblyContext, прочитан без изменения геометрии. На последнем снимке видимости: This Body — 57 граней; This Component — 2 тела / 114 граней; All Components — 5 видимых тел / 338 граней. Суммарное чтение: 0.430 / 0.432 / 0.504 s, чистый анализ: 0.028 / 0.071 / 0.074 s. На более раннем снимке видимости All Components включал 14 тел / 428 граней; изменение видимости пользователем не считается регрессией. Отказ необязательного этапа стенок сообщает ограничение и целиком сбрасывает его пары; полное чтение сущностей и доступные доказательства формы сохраняются.
+A user design previously rejected due to assemblyContext was read without changing the geometry. In the last visibility snapshot: This Body - 57 faces; This Component - 2 bodies / 114 faces; All Components - 5 visible bodies / 338 faces. Total reading: 0.430 / 0.432 / 0.504 s, pure analysis: 0.028 / 0.071 / 0.074 s. In an earlier visibility snapshot, All Components included 14 bodies/428 faces; changing user visibility is not considered a regression. Failure of the optional wall stage communicates the constraint and resets its pairs entirely; full entity readings and available form proofs are preserved.
 
-В этой итерации проходят 140 Python-тестов; реальные Windows CAD и вся релизная матрица остаются открыты. Пользовательские документы не сохранялись и не закрывались, тестовые документы закрыты без сохранения.
+This iteration runs 140 Python tests; real Windows CAD and the entire release matrix remain open. User documents were not saved or closed, test documents were closed without saving.
 
-## Ещё требуется
+## Still required
 
-Полная ручная проверка Examples/Exclude и всех Match-режимов, разные пользовательские детали и STEP, бюджеты большой подсветки, прерывание другой командой/смена документа во всех фазах, применение полученного набора в штатной операции и Windows Fusion. Отдельные команды Native topology/Face Regions UI пока не подключены; автоматический повтор по связанным примерам проверен выше.
+Full manual check of Examples/Exclude and all Match modes, various user parts and STEP, large highlighting budgets, interruption by another command/change of document in all phases, application of the resulting set in standard operation and Windows Fusion. Some Native topology/Face Regions UI commands are not yet enabled; automatic repetition on related examples is checked above.
 
-Использовать отдельный несохранённый документ. Одна CAD-сессия; не закрывать и не менять пользовательские документы. Зафиксировать исходный активный документ, ОС, Fusion version, путь загруженного add-in и число тел/граней/рёбер.
+Use a separate unsaved document. One CAD session; do not close or change user documents. Record the original active document, OS, Fusion version, path of the loaded add-in and the number of bodies/faces/edges.
 
-## Корпус
+## Corpus
 
-Создать root body с рёбрами одинаковой длины разных направлений, параллельными рёбрами разных длин, круговыми кромками и цилиндрами нескольких радиусов. Добавить второе тело с идентичными признаками как отрицательный пример области. Отдельно — STEP с аналогичной геометрией, плоские грани равной площади с разным периметром, противоположно направленные плоскости, внутренний и наружный цилиндры одинакового радиуса.
+Create a root body with edges of the same length in different directions, parallel edges of different lengths, circular edges and cylinders of several radii. Add a second body with identical features as a negative example of an area. Separately - STEP with similar geometry, flat faces of equal area with different perimeter, oppositely directed planes, inner and outer cylinders of the same radius.
 
-## Матрица
+## Matrix
 
-| Проверка | Критерий |
+| Check | Criterion |
 | --- | --- |
-| ПКМ с выбранным ребром/гранью | Ровно один Select Similar, штатные пункты сохранены |
-| ПКМ без выбора / mesh / смешанные типы | Команда не предлагается |
-| Два примера одного тела | Ядро использует оба, порядок не влияет |
-| Примеры разных тел | Явный отказ без расширения области |
-| Поиск при одинаковом втором теле | Ноль результатов из второго тела |
-| Component occurrence | В spike явный отказ; после этапа 4 — только выбранное тело выбранного экземпляра |
-| Предпросмотр | Magenta постоянна, число соответствует ранжированному диапазону, поля Preview нет |
-| Refine | Изменение примеров/исключений и критериев не перечитывает всё BRep; нет рекурсии |
-| Нет совпадений | Примеры сохраняются, диапазон можно расширить, Cancel работает |
-| OK | После закрытия выделение совпадает с Magenta-подсветкой, готово для штатной операции |
-| Cancel / Esc | При том же документе и default Select восстановлены исходные примеры |
-| Прерывание другой командой | Selectra не выполняется неявно и не перезаписывает выбор новой команды |
-| Смена документа до idle | Отложенный перенос не меняет новый документ |
-| Невалидная сущность | Контролируемый отказ, нет частично применённого набора |
-| Stop / Run | Обработчики и команды не дублируются; отложенный callback после Stop не меняет выбор |
-| Модель до/после | Тела, геометрия, таймлайн и состояние modified не изменены Selectra |
-| Плотная перфорация | Отдельно замерены чтение, ранжирование и массовая подсветка; отказ по лимиту не выдаётся за полный результат |
+| RMB with selected edge/face | Exactly one Select Similar, standard items saved |
+| RMB without choice / mesh / mixed types | Command not offered |
+| Two examples of one body | The kernel uses both, the order does not affect |
+| Examples of different bodies | Explicit failure without scope expansion |
+| Search with the same second body | Zero results from the second body |
+| Component occurrence | There is a clear failure in spike; after step 4 - only the selected body of the selected instance |
+| Preview | Magenta is constant, the number corresponds to the ranked range, there is no Preview field |
+| Refine | Changing examples/exceptions and criteria does not re-read the entire BRep; no recursion |
+| No matches | Examples are saved, the range can be expanded, Cancel works |
+| OK | After closing, the selection matches the Magenta highlight, ready for normal operation |
+| Cancel/Esc | With the same document and default Select, the original examples are restored |
+| Abort by another command | Selectra is not executed implicitly and does not overwrite the selection of the new command |
+| Change document to idle | Deferred migration does not change the new document |
+| Invalid entity | Controlled failure, no partially applied set |
+| Stop/Run | Handlers and commands are not duplicated; deferred callback after Stop does not change the choice |
+| Model before/after | Bodies, geometry, timeline and modified state are not changed Selectra |
+| Dense perforation | Reading, ranking and mass illumination were measured separately; refusal according to the limit is not given as a full result |
 
-Проверить геометрическое соответствие каждого результата, а не только число элементов. На двух внешне одинаковых телах недостаточно проверить количество: проверить родительское тело всех выделенных объектов.
+Check the geometric consistency of each result, not just the number of elements. On two externally identical bodies, it is not enough to check the quantity: check the parent body of all selected objects.
 
-## Что сохранить в отчёте
+## What to save in the report
 
-Для сценария: параметры модели, исходные tempId в пределах неизменённого тела, выбранная гипотеза, ожидаемый/фактический набор, длительности и скриншот там, где нужен визуальный результат. Сравнивать entityToken как строки запрещено; долговременную идентичность разрешать через API.
+For the scenario: model parameters, initial tempId within the unchanged body, selected hypothesis, expected/actual set, durations and a screenshot where a visual result is needed. Comparing entityTokens as strings is not allowed; Resolve long-term identity via API.
 
-Локальные тесты проверяют вывод гипотез и числовые допуски. Static API definitions подтверждают существование методов, но не порядок событий, отрисовку или сохранение выбора. Только эта матрица на реальном Fusion закрывает техническую приёмку.
+Local tests test hypotheses and numerical tolerances. Static API definitions validate the existence of methods, but not the order of events, drawing, or saving selections. Only this matrix on a real Fusion closes technical acceptance.
 
-## Порядок плоскостей — нативная проверка 25.10.2026
+## Plane order - native check 10/25/2026
 
-На macOS в отдельном несохранённом DirectDesign выполнен сценарий `tests/fusion_plane_acceptance.py`: пластина с четырьмя сквозными отверстиями радиуса 0.2 cm и отдельный перпендикулярный цилиндр. Исходный экземпляр повёрнут на 0.35 rad вокруг Y; второй экземпляр определения повёрнут вокруг X и перенесён. Пользовательский документ не редактировался.
+On macOS, in a separate unsaved DirectDesign, the `tests/fusion_plane_acceptance.py` scenario was executed: a plate with four through holes of radius 0.2 cm and a separate perpendicular cylinder. The original instance is rotated 0.35 rad around Y; the second instance of the definition is rotated around X and moved. The user document has not been edited.
 
-В This Component реальные = и PgUp дали 4 → 8 → 10 круговых кромок: плоскость выбранного входа отверстия → параллельная обратная сторона → перпендикулярный цилиндр. В All Components получены 4 → 8 → 20: кромки другого повёрнутого экземпляра добавились только на третьем шаге. Проверены радиус каждой сущности, классы плоскостей и соответствие ключей renderer результату. После обновления графики все включённые рёбра имели видимый контур; первый уровень сохранял вес 1.5 px, новый — 3 px. Скриншот подтвердил сохранение Magenta на отверстиях при добавлении второго уровня.
+In This Component real = and PgUp gave 4 → 8 → 10 circular edges: selected hole entry plane → parallel back → perpendicular cylinder. In All Components we got 4 → 8 → 20: the edges of the other rotated instance were added only in the third step. The radius of each entity, plane classes and the correspondence of the renderer keys to the result were checked. After updating the graphics, all included edges had a visible outline; the first level retained a weight of 1.5 px, the new one - 3 px. The screenshot confirmed that Magenta remained on the holes when adding a second level.
 
-OK в All Components перенёс ровно 20 ожидаемых proxy-сущностей в activeSelections. Остаточных CustomGraphicsGroups нет. Тестовый документ закрыт без сохранения, исходный пользовательский документ и его выбор восстановлены. Это проверка воспроизводимой геометрии отверстий, не точное воспроизведение меняющегося выбора пользовательской детали и не Windows CAD-приёмка.
+OK in All Components transferred exactly 20 expected proxy entities to activeSelections. There are no residual CustomGraphicsGroups. The test document is closed without saving, and the original user document and its selection are restored. This is a test of reproducible hole geometry, not an exact reproduction of a changing user part selection, and not a Windows CAD acceptance test.
 
-## Несколько фигурных областей — проверка 25.10.2026
+## Multiple shaped regions - check 10/25/2026
 
-На текущем пользовательском выборе двух несвязанных плоских граней разных тел одного компонента воспроизведён дефект: первый набор из 26 граней содержал большие стенки, гипотеза — parallel_planes. Площади примеров около 1.08035 и 1.11800 cm². По отдельности поиск также терял аналоги из-за разных чисел точек дискретизации одинаковых кривых.
+The current user selection of two unrelated planar faces of different bodies of the same component reproduced the defect: the first set of 26 faces contained large walls, the hypothesis is parallel_planes. The areas of the examples are about 1.08035 and 1.11800 cm². Separately, the search also lost analogues due to different numbers of sampling points for identical curves.
 
-После исправления на том же неизменённом выборе живой preview дал 6 фигурных граней (по три из каждого семейства), гипотеза shape_families. Реальная клавиша = добавила ещё 6 аналогов в других плоскостях; - вернула первый набор из 6. Сверены конкретные session-local ключи, renderer.keys, отсутствие preview_error и визуальная Magenta-подсветка. Чистый анализ локального числового снимка занял около 0.37 s, построение нативной графики — 0.098 s. Перестановка двух примеров сохранила всё ранжирование. Preview оставлен пользователю на первом уровне; OK не нажимался, геометрия и таймлайн не менялись. Пользовательская геометрия не включена в публичный корпус.
+After correction on the same unchanged choice, the live preview gave 6 shaped faces (three from each family), hypothesis shape_families. Real key = added 6 more analogues in other planes; - returned the first set of 6. Specific session-local keys, renderer.keys, absence of preview_error and visual Magenta highlighting were verified. Pure analysis of a local numerical image took about 0.37 s, construction of native graphics - 0.098 s. Rearranging the two examples preserved the entire ranking. Preview is left to the user at the first level; OK was not pressed, the geometry and timeline did not change. User geometry is not included in the public corpus.
 
-Регрессии в ядре: несвязанные семейства вместо всех параллельных стенок; одинаковая криволинейная граница с разными числами точек, поворотом и отражением; общий transform внешней границы и отверстий при разных дискретизациях. Связанный повтор узла и пары стенок сохраняют существующие тесты.
+Regressions in the core: unconnected families instead of all parallel walls; the same curvilinear border with different numbers of points, rotation and reflection; general transform of the outer boundary and holes at different sampling rates. Linked repeat node and wall pairs preserve existing tests.
 
-## Внутренние стороны пазов — 26.10.2026
+## Inner sides of grooves - 10/26/2026
 
-На текущем выборе шести внутренних граней пользовательской детали воспроизведён seed-only результат: два несвязанных образца по три грани (цилиндр и две NURBS). После доработки живой preview показал 12 соответствующих граней в исходной плоскости; = добавил ещё 6 в других плоскостях. Промежуточной параллельной группы у этого снимка нет. Проверены точные ключи результата, renderer.keys, отсутствие preview_error и визуальная Magenta-подсветка. Чистый анализ — около 0.19 s. Пользовательская геометрия не менялась.
+Using the current selection of six internal faces of a user part, the seed-only result is reproduced: two unrelated samples of three faces each (a cylinder and two NURBS). After finalization, the live preview showed 12 corresponding faces in the original plane; = added 6 more in other planes. This snapshot does not have an intermediate parallel group. The exact result keys, renderer.keys, absence of preview_error and visual Magenta highlighting were checked. Pure analysis - about 0.19 s. The user geometry did not change.
 
-Полная нативная приёмка выполнена в той же CAD-сессии на отдельной несохранённой копии двух тел, созданной `tests/fusion_curved_acceptance.py`. Шесть исходных граней сопоставлены копии по типу, площади и мировым BRep-вершинам. Получена последовательность 12 → 18 → 12 по реальным =/-. OK перенёс ровно 12 ожидаемых ссылок, CustomGraphicsGroups очищены. Исходные body_stamp и isModified остались прежними. Копия закрыта без сохранения, исходные шесть примеров восстановлены. В пользовательском документе повторно открыт preview первого уровня без OK. Геометрия модели не включена в публичный корпус.
+Full native acceptance was performed in the same CAD session on a separate unsaved copy of the two bodies created by `tests/fusion_curved_acceptance.py`. The six original faces are compared with copies by type, area, and world BRep vertices. The resulting sequence is 12 → 18 → 12 by real =/-. OK moved exactly 12 expected entity references, CustomGraphicsGroups cleared. The original body_stamp and isModified remain the same. The copy was closed without saving, the original six examples were restored. In the user document, the first-level preview is reopened without OK. The model geometry is not included in the public corpus.
 
-Семь новых Python-регрессий проверяют целую группу, отдельные уровни та же/параллельная/другая плоскость, инвариантность порядка примеров, исключение всей группы, отклонение неверного взаимного расположения, выступа поверхности при совпадающих вершинах, неправильного направления нормалей, поворот/отражение, отсутствующие mesh-данные, бюджет и сериализацию. Это дискретное свидетельство поверхности, а не аналитическое доказательство равенства произвольных NURBS. Windows CAD не проверен.
+Seven new Python regressions test whole group, individual levels same/parallel/different plane, example order invariance, whole group exclusion, misalignment rejection, surface overhang when vertices coincide, normal misdirection, rotation/reflection, missing mesh data, budget, and serialization. This is discrete evidence of a surface, not an analytical proof that arbitrary NURBS surfaces are equal. Windows CAD is not verified.
 
 ## Select Chain — 26.10.2026
 
-В одной нативной macOS CAD-сессии выполнен `tests/fusion_chain_acceptance.py`: отдельный несохранённый карман (внешний параллелепипед 6×5×3 cm, вырез 4×3 cm, четыре внутренние стенки) и второе идентичное тело рядом. Из одной внутренней стенки Select Chain дал ровно четыре ожидаемых стенки, без дна, обода и внешних граней. = расширил набор до шести граней; - вернул четыре. Screenshot подтвердил устойчивую Magenta-подсветку стенок. OK перенёс ровно четыре ожидаемые BRepFace, графика очищена.
+In one native macOS CAD session, `tests/fusion_chain_acceptance.py` was executed: a separate unsaved pocket (outer parallelepiped 6x5x3 cm, cutout 4x3 cm, four inner walls) and a second identical body nearby. From one inner wall, Select Chain produced exactly four expected walls, without the bottom, rim or outer edges. = expanded the set to six faces; - returned four. Screenshot confirmed the stable Magenta highlighting of the walls. OK transferred exactly four expected BRepFaces, graphics cleaned up.
 
-Из одного ребра внутреннего обода получены ровно четыре ребра исходной петли. Реальные PgUp/PgDown дали 4→7→4 ребра. Cancel восстановил единственное исходное ребро; повторный запуск и OK сохранили ровно ожидаемые четыре BRepEdge. На всех шагах проверено родительское тело каждого результата: в соседнем теле ничего не выделялось.
+Exactly four edges of the original loop are obtained from one edge of the inner rim. Real PgUp/PgDown gave 4→7→4 edges. Cancel restored the single original edge; restart and OK retained exactly the expected four BRepEdge. At all steps, the parent body of each result was checked: nothing was selected in the neighboring body.
 
-Нативное событие контекстного меню при одном выбранном ребре добавило обе команды без ошибок; регистрация и исполнение Select Chain проверены. Всплывающее меню не было доступно в скриншоте выбранного окна, поэтому визуальная позиция пункта этим прогоном не подтверждена. Тестовый документ закрыт без сохранения, исходный документ и выбор восстановлены. Python-тесты покрывают целые уровни, внутренний приоритет, дубли, равные доказательства, отсутствие цепочки и недостижимые контуры. Windows CAD и произвольные сложные стенки требуют отдельного корпуса.
+The native context menu event with one edge selected added both commands without errors; Select Chain registration and execution verified. The popup menu was not available in the screenshot of the selected window, so the visual position of the item was not confirmed by this run. The test document is closed without saving, the original document and selection are restored. Python tests cover whole levels, internal priority, duplicates, equal proofs, unchaining, and unreachable loops. Windows CAD and arbitrary complex walls require a separate test corpus.
 
-## Select Chain через точный контакт — 26.10.2026
+## Select Chain via precise contact - 10/26/2026
 
-На фактическом пользовательском выборе двух NURBS-рёбер разных половин тела (Body1/Body2 одного экземпляра) воспроизведён отказ старого однопримерного/однотелого режима. Полное совпадение общих граней подтверждено двусторонней пустой разностью BRep-поверхностей; solid intersection пусто. После временного union и обратного сопоставления ближайший контур содержит шесть исходных рёбер, включая оба примера. Анализ занимал около 0.9 s. По одной внутренней NURBS-грани этого же паза найдено шесть исходных стенок по кругу (около 1.1 s). Геометрия пользовательской детали в публичный корпус не сохранена.
+The actual user selection of two NURBS edges of different body halves (Body1/Body2 of one instance) reproduced the failure of the old single-example/single-body mode. The complete coincidence of common faces is confirmed by the two-sided empty difference of BRep surfaces; solid intersection is empty. After a temporary union and reverse mapping, the closest contour contains the six original edges, including both examples. The analysis took about 0.9 s. Along one internal NURBS face of the same groove, six original walls in a circle were found (about 1.1 s). The geometry of the user part is not saved to the public body.
 
-Отдельная несохранённая CAD-фикстура `tests/fusion_contact_chain_acceptance.py`: две половины пластины со сквозным отверстием в повёрнутом и перенесённом occurrence. Полный контакт принят; зазоры 1e-5, 1e-7 и 1e-8 cm, частичное соприкосновение, касание только ребром и перекрытие отклонены. Из двух исходных дуг при включённой Chain across contact построена замкнутая окружность, результат возвращён ровно на две исходные дуги. Выключение галочки сохранило примеры и отключило OK с явным сообщением об отсутствии общего контура; повторное включение вернуло его.
+Separate unsaved CAD fixture `tests/fusion_contact_chain_acceptance.py`: two halves of a plate with a through hole in a rotated and transferred occurrence. Full contact accepted; gaps 1e-5, 1e-7 and 1e-8 cm, partial contact, edge contact only and overlap rejected. From two initial arcs, with Chain across contact enabled, a closed circle is constructed, the result was reduced back to exactly two original arcs. Unchecking the checkbox saved the examples and disabled OK with an explicit message about the lack of a common outline; turning it on again brought it back.
 
-Для одной цилиндрической стенки включённая галочка дала две половины внутренней стенки на двух телах; выключенная ограничила результат исходным телом. При повторном включении и OK выделились ровно две ожидаемые исходные грани. Оба варианта OK проверены по ссылкам и отсутствию остаточной CustomGraphics-графики. Тестовый документ закрыт без сохранения, исходный выбор восстановлен. В пользовательском документе открыт preview шести рёбер через исходные два примера, OK не нажат. Ползунок и клавиши используют прежний общий жизненный цикл; нативная проверка Windows не выполнялась.
+For one cylindrical wall, the enabled checkbox gave two halves of the inner wall on two bodies; turned off limited the result to the original body. When you turned it on again and OK, exactly two expected original faces were selected. Both options are OK, checked for links and absence of residual CustomGraphics. The test document is closed without saving, the original selection is restored. In the user document, a preview of six edges through the original two examples is open, OK is not pressed. The slider and keys use the same general lifecycle; Windows native scan was not performed.
 
-Отдельная отрицательная проверка обнаружила, что ASM первоначально принимал частичный стык со сдвигом вдоль плоскости на 1e-8 cm. Воспроизводимый assert сначала падал. После добавления строгого двустороннего совпадения границ этот сдвиг отклоняется, истинный нулевой стык принимается, а исходные пользовательские половины по-прежнему соединяются за около 0.9 s. Проверка нормального зазора сама по себе была бы недостаточна.
+A separate negative check found that the ASM initially accepted a partial joint with an in-plane offset of 1e-8 cm. The reproducible assert initially failed. After adding strict two-way edge matching, this shift is rejected, the true zero-gap contact is accepted, and the original user halves are still joined in about 0.9 s. Checking for normal clearance alone would not be sufficient.
 
-## Плоскость контура и запуск по одному ребру — 26.10.2026
+## Contour plane and launch along one edge - 10.26.2026
 
-Пользователь указал ожидаемую плоскую петлю из шести рёбер паза двух соприкасающихся тел. При запуске по одному ребру старый режим выбирал другой, пространственный обход из шести рёбер. Диагностика показала две причины: приоритет периметра/соседства перед плоскостью и отсутствие нужной петли среди кандидатов. Одна дуга была ошибочно исключена из обратного сопоставления: её BRep-вершина лежит слегка вне собственной аналитической окружности в пределах допуска ASM. Кривая при этом полностью совпадает с исходной, что подтверждается двусторонней пустой разностью проводов. Для сопоставления теперь используются собственные точки кривой; строгая проверка контакта тел, включая BRep-вершины границы, сохранена.
+The user specified the expected flat loop of six groove edges of two touching bodies. When running along one edge, the old mode chose another, spatial traversal of six edges. Diagnostics showed two reasons: the priority of the perimeter/neighborhood over the plane and the absence of the required loop among the candidates. One arc was mistakenly excluded from the reverse matching: its BRep vertex lies slightly outside its own analytical circle within the ASM tolerance. The curve completely coincides with the original one, which is confirmed by the two-sided empty difference of the wires. The curve's own points are now used for matching; strict check of contact of bodies, including BRep-vertices of the boundary, is preserved.
 
-На том же пользовательском документе запуск по одному ребру дал на первом уровне ровно ожидаемые шесть ссылок BRepEdge, включая ранее терявшуюся дугу; статус In the example plane. Реальные =/- дали 6→12→6 рёбер, оба первых контура находятся в исходной плоскости. Screenshot подтвердил целую Magenta-петлю требуемого паза.
+On the same user document, running one edge at a time gave exactly the expected six BRepEdge entities at the first level, including the previously lost arc; status In the example plane. Real =/- gave 6→12→6 edges, both first contours are in the original plane. Screenshot confirmed the entire Magenta loop of the required groove.
 
-На отдельной несохранённой повёрнутой Split-фикстуре `tests/fusion_contact_chain_acceptance.py` запуск по одной дуге дал полный контур из двух исходных дуг двух тел. = и PgUp дали 2→8→10 рёбер: первая и вторая группы копланарны, третья — параллельная. PgDown/- вернули первый набор; OK сохранил ровно две ожидаемые ссылки, остаточной графики нет. Зазоры, частичный контакт, малый тангенциальный сдвиг и перекрытие по-прежнему отклоняются. Тестовый документ закрыт без сохранения. Пользовательский документ восстановлен; preview оставлен на первом контуре по одному ребру без OK.
+On a separate unsaved rotated Split fixture `tests/fusion_contact_chain_acceptance.py`, launching along one arc gave a complete contour of two initial arcs of two bodies. = and PgUp gave 2→8→10 edges: the first and second groups are coplanar, the third is parallel. PgDown/- returned the first set; OK saved exactly two expected entity references, no residual graphics. Gaps, partial contact, small tangential shear and overlap are still rejected. The test document is closed without saving. The user document has been restored; preview is left on the first contour along one edge without OK.
 
-Python-регрессии проверяют приоритет большой копланарной петли перед короткой пространственной, целые уровни та же/параллельная/остальная/неизвестная плоскость, порядок кандидатов, поворот/отражение/перенос и сохранение условия прохождения первого контура через пример.
+Python regressions check the priority of a large coplanar loop over a short spatial one, integer levels of the same/parallel/remaining/unknown plane, candidate order, rotation/reflection/translation, and preserving the condition of passing the first loop through the example.
 
-## Select Chain: обязательное прохождение через выбор на каждом шаге — 26.10.2026
+## Select Chain: mandatory passage through selection at every step - 10/26/2026
 
-Пользователь уточнил смысл операции: нужны только контуры, проходящие через выбранное ребро/грань, а не соседние петли в той же плоскости. Предыдущий отбор ограничивал этим условием только первый шаг, а остальные ранжировал по графовой близости; это было ошибкой спецификации. Графовое расширение удалено из ChainSelection. Теперь каждый кандидат до ранжирования содержит все примеры; плоскость, внутренняя петля и периметр упорядочивают только такие кандидаты.
+The user clarified the meaning of the operation: only contours passing through the selected edge/face are needed, and not neighboring loops in the same plane. The previous selection limited only the first step to this condition, and ranked the rest by graph proximity; this was a specification error. The graph extension has been removed from ChainSelection. Now each candidate contains all examples before ranking; plane, inner loop, and perimeter are the only candidates that order.
 
-Три исправленных/новых Python-проверки первоначально падали: соседняя копланарная петля попадала в расширение, на максимуме появлялись контуры без одного из двух примеров, а проверка прохождения была ограничена первым уровнем. После исправления все диапазоны исключают эти кандидаты.
+Three fixed/new Python checks initially failed: an adjacent coplanar loop would fall into the expansion, contours would appear at maximum without one of the two examples, and the pass check would be limited to the first level. After correction, all ranges exclude these candidates.
 
-На текущем пользовательском ребре получены ровно два допустимых контура, каждый содержит исходное ребро. Первый даёт нужную плоскую петлю из 6 рёбер. = добавляет альтернативный пространственный обход через то же ребро (суммарно 10 рёбер), повторное = на максимуме ничего не добавляет. - возвращает 6. Сверено полное множество всех включаемых рёбер с объединением только контуров через исходный пример; соседние отверстия не входят ни на одном уровне.
+On the current user edge, exactly two valid contours are obtained, each containing the original edge. The first gives the desired flat loop of 6 edges. = adds an alternative spatial traversal through the same edge (10 edges in total), repeated = at maximum adds nothing. - returns 6. The complete set of all included edges is verified with the union of only contours through the original example; adjacent holes are not included at any level.
 
-В отдельном несохранённом повёрнутом Split-примере запуск по одной дуге имеет только один допустимый замкнутый контур: две исходные дуги двух тел. Реальные PgUp/= не расширяют его посторонними петлями. Для одной стенки также остаётся только соответствующая замкнутая цепочка стенок. Оба OK дают ровно ожидаемые исходные ссылки; графика очищена. Тестовый документ закрыт без сохранения; пользовательский выбор восстановлен и preview оставлен на первом контуре. Это заменяет ошибочное ожидание расширения 2→8→10 из предыдущего протокола.
+In a separate unsaved rotated Split example, a single arc run has only one valid closed loop: the two original arcs of the two bodies. Real PgUp/= do not extend it with extraneous loops. For one wall, only the corresponding closed chain of walls remains. Both OKs give exactly the expected source links; graphics have been cleaned up. The test document is closed without saving; the user selection is restored and preview is left on the first circuit. This replaces the erroneous expectation of extension 2→8→10 from the previous protocol.
 
-## Select Chain: отдельные варианты и контур исходного тела — 26.10.2026
+## Select Chain: individual options and contour of the original body - 10.26.2026
 
-Пользователь показал пропущенную замкнутую петлю из 8 рёбер целиком на Body2, включая два ребра по границе разреза. Воспроизводимая проверка сначала падала: при Chain across contact контур отсутствовал в каталоге; при выключенном контакте он присутствовал. Причина — временный union удалял шов, а каталог строился только по виртуальному телу. Исправление сохраняет исходные петли каждого тела и добавляет сквозные. По одному ребру пользовательской детали получены четыре отдельных варианта: 6, 8, 4 и 6 рёбер; первые два копланарны. Второй вариант точно совпал со всеми восемью выделенными пользователем ссылками.
+The user showed a missing closed loop of 8 edges in its entirety on Body2, including two edges along the cut boundary. The reproducible check initially failed: with Chain across contact, the contour was not in the catalog; when the contact was turned off, it was present. The reason is that the temporary union removed the seam, and the catalog was built only on the virtual body. The fix preserves the original loops of each body and adds end-to-end loops. For one edge of a user part, four separate options are obtained: 6, 8, 4 and 6 edges; the first two are coplanar. The second option exactly matched all eight entity references selected by the user.
 
-По уточнённой семантике PgUp/= выбирают следующий полный контур вместо предыдущего, PgDown/- возвращают предыдущий. Накопления и слияния разных равных вариантов нет. Полный контур не исчезает из списка, даже если все его рёбра встречались в других вариантах. Каждый вариант на каждом шаге проходит через все примеры. Для Select Similar накопительный диапазон сохранён. Это заменяет ранее ошибочно принятое поведение расширения Select Chain.
+According to the refined semantics, PgUp/= selects the next full contour instead of the previous one, PgDown/- returns the previous one. There is no accumulation and merging of different equal options. The full contour does not disappear from the list, even if all its edges were found in other options. Each option goes through all the examples at each step. For Select Similar, the cumulative range is preserved. This replaces the previously erroneous behavior of the Select Chain extension.
 
-В пользовательском документе реальная = переключила 6→8 рёбер. Проверено точное совпадение второго варианта с показанным контуром и скрытие графики первого варианта, не входящей во второй; геометрия не менялась.
+In the user document, real = switched 6→8 edges. The exact match of the second option with the shown outline was checked and the graphics of the first option that were not included in the second were hidden; the geometry did not change.
 
-В одной отдельной несохранённой CAD-сессии на повёрнутых половинах пластины с отверстием выполнена фикстура `fusion_contact_chain_acceptance.py`. Полный стык принят, зазоры, малый тангенциальный сдвиг, частичный контакт и перекрытие отклонены. По одной дуге есть три варианта: сквозная окружность из 2 исходных дуг, родной контур половины тела из 6 рёбер и граница половины стенки из 4 рёбер. Реальные =/- дали 2→6→4→6 с заменой подсветки. На втором варианте все рёбра относятся только к первому телу; графика предыдущей сквозной петли скрыта. OK выделил ровно 6 ожидаемых исходных рёбер, CustomGraphics очищены. Тестовый документ закрыт без сохранения, пользовательский документ восстановлен.
+In one separate unsaved CAD session, a `fusion_contact_chain_acceptance.py` fixture was made on the rotated halves of a plate with a hole. Full joint accepted, gaps, small tangential shift, partial contact and overlap rejected. There are three options for one arc: a through circle of 2 original arcs, the native contour of half the body of 6 edges, and the border of half a wall of 4 edges. Real =/- gave 2→6→4→6 with replacement of the highlighting. In the second option, all edges belong only to the first body; the graphics of the previous through loop are hidden. OK allocated exactly 6 expected source edges, CustomGraphics cleared. The test document was closed without saving, the user document was restored.
 
-Python-регрессии проверяют строгую принадлежность всех вариантов исходным примерам, отсутствие накопления, отдельный перебор равных вариантов, сохранение контуров из ранее использованных рёбер и доступность исходной линии разреза наряду со сквозным контуром.
+Python regressions check that all variants are strictly related to the original examples, the absence of accumulation, the separate search of equal variants, the preservation of contours from previously used edges, and the availability of the original cut line along with the end-to-end contour.
 
-## Общая граница трёх плавных стенок — 26.10.2026
+## Common boundary of three smooth walls - 10.26.2026
 
-Пользователь показал ещё один отсутствующий контур из 8 рёбер на Body2: передний и задний профиль половины паза, соединённые двумя рёбрами по глубине у разреза. Ранее найденные четыре варианта и их порядок пользователь подтвердил. Проверка tangentiallyConnectedFaces выявила группу из цилиндрической и двух NURBS-стенок; её общая граница точно совпала с выделенными восемью ссылками. Старый каталог содержал границы отдельных граней, но не общую границу этой группы; проверка отсутствия воспроизводилась до исправления.
+The user showed another missing 8-edge contour on Body2: the front and back profile of the groove half, connected by two depth edges at the cut. The user confirmed the previously found four options and their order. Checking tangentiallyConnectedFaces revealed a group of cylindrical and two NURBS walls; its general boundary coincided exactly with the highlighted eight links. The old catalog contained the boundaries of individual faces, but not the overall boundary of that group; the absence check was reproduced before correction.
 
-После добавления границ плавных групп получены 6 вариантов; прежние четыре остались первыми в прежнем порядке. Новый показанный контур — пятый, замкнутый и неплоский. Полное совпадение с пользовательским выбором проверено по ссылкам. Перебор остаётся заменой одного варианта другим, каждый проходит через исходное ребро. Чтение/поиск на текущем примере заняли около 1.3 s. Геометрия пользовательского проекта не сохранялась в публичный корпус.
+After adding the boundaries of smooth groups, 6 options were obtained; the previous four remained first in the same order. The new contour shown is the fifth one, closed and non-planar. Full match with user selection was checked using the links. Enumeration remains the replacement of one option with another, each passing through the original edge. Reading/searching in the current example took about 1.3 s. The geometry of the user project was not saved to the public corpus.
 
-Нативная приёмка `tests/fusion_patch_chain_acceptance.py` проведена в отдельном несохранённом документе: пластина с капсульным пазом разделена пополам, обе половины размещены в повёрнутом occurrence. Нужный контур задан независимо по геометрии модели: три передних, три задних ребра и два торцевых, всего 8. По одному ребру найден четвёртый вариант — точная общая граница трёх касательных стенок. Проверены исходные ссылки, отсутствие накопления и скрытие графики других вариантов. OK перенёс ровно эти 8 рёбер, остаточной графики нет. Тестовый документ закрыт без сохранения, пользовательский документ и выбор восстановлены.
+Native acceptance of `tests/fusion_patch_chain_acceptance.py` was carried out in a separate unsaved document: the plate with the capsular groove is divided in half, both halves are placed in a rotated occurrence. The required contour was specified independently according to the geometry of the model: three front, three rear edges and two end ones, 8 in total. Based on one edge, the fourth option was found - the exact common boundary of the three tangent walls. Checked the original entity references, no accumulation and hiding of graphics of other options. OK transferred exactly these 8 edges, there are no residual graphics. The test document is closed without saving, the user document and selection are restored.
 
-Пять новых Python-регрессий проверяют исключение внутренних рёбер, общий обход трёх стенок, раздельные переднее/заднее кольца, периодический шов, круглую петлю, отказ для открытой/разветвлённой границы, неполных данных и превышения бюджета.
+Five new Python regressions test for internal edge elimination, common three-wall traversal, split front/back rings, periodic seam, circular loop, open/branched border failure, incomplete data, and over budget.
 
-## Промежуточные части плавного участка — 26.10.2026
+## Intermediate parts of the smooth section - 10.26.2026
 
-Два примера пользователя, рёбра 1470 и 1690 Body2, воспроизводимо давали ноль вариантов. Общая граница двух соседних граней 1695 и 1689 содержит оба примера и 10 рёбер. В полном плавном участке из девяти граней ребро 1690 становится внутренним и исключается; каталог отдельных граней и полного участка поэтому пропускал этот обход.
+Two user examples, edges 1470 and 1690 Body2, reproducibly produced zero variations. The common boundary of two adjacent faces 1695 and 1689 contains both examples and 10 edges. In a full smooth section of nine faces, edge 1690 becomes internal and is eliminated; the catalog of individual faces and the complete section therefore skipped this walkthrough.
 
-Добавлен перебор связных промежуточных частей плавных участков с доказательством замкнутости по точной вершинной топологии. Повторные границы исключаются до чтения плоскостей и длин, сведения о рёбрах кэшируются на участок. После исправления на текущем проекте найдены 42 разных контура через оба примера, ожидаемые 10 рёбер идут первыми; чтение заняло около 2.4 s. Прежние четыре варианта для одного ребра остались первыми в прежнем порядке. В живом preview проверены =/-: 10→12→10, оба примера во всех вариантах, видимая графика ровно текущего результата. Геометрия и таймлайн не менялись, OK не нажат.
+Added enumeration of connected intermediate parts of smooth sections with proof of closure based on the exact vertex topology. Duplicate boundaries are excluded before planes and lengths are read, and edge information is cached per section. After correction on the current project, 42 different contours are found through both examples, the expected 10 edges come first; reading took about 2.4 s. The previous four options for one edge remained first in the same order. In the live preview, tested =/-: 10→12→10, both examples in all variants, visible graphics of exactly the current result. The geometry and timeline did not change, OK was not pressed.
 
-179 Python-тестов включают регрессии промежуточного участка с исчезающим внутренним ребром, явного бюджета и сохранения приоритета старых вариантов. Эта проверка подтверждает описанный случай, а не полноту всех возможных пространственных циклов произвольного BRep.
+The 179 Python tests include regressions of vanishing internal edge staging, explicit budgeting, and preserving legacy precedence. This check confirms the described case, and not the completeness of all possible spatial cycles of an arbitrary BRep.
 
 
-## Stable 1.0.0 — проверка установки и демо, 26.10.2026
+## Stable 1.0.0 - installation check and demo, 10/26/2026
 
-В Fusion 2706.1.14 на macOS создан отдельный несохранённый документ: пластина с шестью отверстиями и капсульным пазом разделена на два точно соприкасающихся тела. Три реальные PNG из viewport (1800 × 1100) находятся в `docs/images`: Select Similar по стенке находит четыре одинаковые полные цилиндрические грани; Select Chain по ребру находит шесть рёбер замкнутого паза через два тела; по стенке — шесть граней всего обхода. Применение обоих контуров через OK дало ровно шесть исходных сущностей, временная графика очищена.
+Fusion 2706.1.14 on macOS creates a separate unsaved document: a plate with six holes and a capsular groove is divided into two precisely touching bodies. Three real PNGs from the viewport (1800 × 1100) are in `docs/images`: Select Similar by wall finds four identical full cylindrical faces; Select Chain by Edge finds six edges of a closed groove through two bodies; along the wall - six faces of the entire loop. Applying both circuits via OK gave exactly six initial entities, the temporary graphics were cleared.
 
-Локальный пакет 1.0.0 распакован в чистую папку и добавлен через GUI Scripts and Add-Ins → Script or add-in from device. В GUI отображены версия 1.0.0 и путь распакованной копии. Копия запущена; по фактическому пути загруженного модуля подтверждено выполнение из пакета. Select Similar дал четыре грани в preview и после OK, Select Chain — шесть рёбер через два тела в preview и после OK; остаточной графики нет. Тестовый документ закрыт без сохранения; исходный документ, выбор и рабочее дополнение восстановлены. После этого Fusion освобождён для других задач пользователя.
+Local package 1.0.0 was unpacked into a clean folder and added via GUI Scripts and Add-Ins → Script or add-in from device. The GUI displays version 1.0.0 and the path of the unpacked copy. The copy is running; according to the actual path of the loaded module, execution from the package is confirmed. Select Similar gave four faces in preview and after OK, Select Chain - six edges through two bodies in preview and after OK; There are no residual graphics. The test document is closed without saving; the original document, selection and working addition have been restored. After this, Fusion is freed up for other user tasks.
 
-182 Python-теста включают проверки release gate: версия тега и manifest, наличие пакетов всех трёх ОС, checksum и идентичность ZIP. Релизные ZIP и SHA-256 собираются и публикуются только GitHub Actions по тегу, локальный ZIP использован только для GUI-проверки установки. Нативная приёмка Windows Fusion не выполнялась.
+182 Python tests include release gate checks: tag and manifest version, presence of packages for all three OSes, checksum and ZIP identity. Release ZIP and SHA-256 are collected and published only by GitHub Actions by tag, local ZIP is used only for GUI verification of the installation. Windows Fusion native acceptance was not performed.
 
-## Замкнутая полоса граней — 28.10.2026
+## Closed strip of faces — 10/28/2026
 
-На текущей модели пользователя выполнено только чтение BRep: выбранный ожидаемый обод состоит из четырёх граней. До изменения его не было в каталоге; после изменения вызов обновлённого adapter с одной исходной гранью вернул этот набор первым из 18 вариантов. Проверка выполнена прямым вызовом adapter, без запуска диалога Select Chain, проверки подсветки или применения OK. Регрессионная фикстура содержит упрощённую топологию четырёх граней и условные размеры без координат и названий модели.
+On the current user model, read-only BRep is performed: the selected expected rim consists of four faces. It was not in the catalog before the change; after the change, calling the updated adapter with one source face returned this set as the first of 18 options. The check is performed by calling adapter directly, without launching the Select Chain dialog, checking the highlight, or applying OK. The regression fixture contains a simplified topology of four faces and conditional dimensions without coordinates and model names.
 
-185 Python-тестов прошли, включая приоритет обода для каждой из четырёх граней, сохранение прежних вариантов и отказ при превышении бюджета. Полная приёмка UI в отдельном несохранённом документе и проверка Windows ещё не проводились.
+Passed 185 Python tests, including rim priority for each of the four faces, retention of previous options, and failure when exceeding budget. Full acceptance of the UI in a separate unsaved document and Windows testing have not yet been carried out.
 
-Повторная проверка в Fusion 2706.1.14 на macOS: в отдельный несохранённый документ скопировано тело, а четыре грани сопоставлены по центроиду и площади. После штатной перезагрузки Selectra команда по одной исходной грани показала ожидаемые четыре грани первой из 18 вариантов; Magenta-подсветка проверена визуально и по ссылкам. Клавиши `=` и `-` переключили 1 → 2 → 1 без накопления. OK перенёс ровно четыре ожидаемые грани, временная графика очищена. Тестовый документ закрыт без сохранения, исходный документ и его прежнее выделение восстановлены. Windows не проверялась.
+Rechecked in Fusion 2706.1.14 on macOS: the body was copied into a separate unsaved document, and the four faces were matched by centroid and area. After a normal restart of Selectra, the command showed the expected four faces of the first of 18 options, one by one; Magenta highlighting was checked visually and using links. The `=` and `-` keys switched 1 → 2 → 1 without accumulation. OK transferred exactly four expected faces, the temporary graphics were cleared. The test document is closed without saving, the original document and its previous selection are restored. Windows has not been tested.
 
-Установочный ZIP 1.0.1 распакован и подключён через Scripts and Add-Ins. Проверены версия и путь загруженной копии, первый контур из четырёх граней на отдельной копии модели, OK и очистка графики. После проверки тестовая регистрация удалена, рабочая копия подключена и запущена; исходный документ и выделение восстановлены. Все 185 тестов также прошли из распакованного архива.
+Installation ZIP 1.0.1 is unpacked and connected via Scripts and Add-Ins. Checked the version and path of the loaded copy, the first outline of four faces on a separate copy of the model, OK and cleared the graphics. After verification, the test registration is deleted, the working copy is connected and launched; the original document and selection are restored. All 185 tests were also passed from the unpacked archive.
