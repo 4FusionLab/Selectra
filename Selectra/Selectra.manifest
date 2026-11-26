@@ -2,7 +2,7 @@
   "autodeskProduct": "Fusion360",
   "type": "addin",
   "id": "98a76b49-14e7-45dc-b051-c2c397eff6c0",
-  "author": "DiegoV",
+  "author": "Pavel Kuznetsov",
   "description": {
     "": "Selectra: select similar BRep edges and faces, or follow closed contours in Autodesk Fusion."
   },
